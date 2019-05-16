@@ -27,6 +27,10 @@ contract CoinPool{
     // mustOpen 表示只有资金池处于打开状态, 并且对应的game允许动用资金, 才可以通过
     modifier onlyGamer(){require(openning==true&&games[msg.sender]==true);_;}
 
+    function swithcTBT(TRC20 _tbt) public{
+        tbt = _tbt;
+    }
+
     // 创建合约,设置owner为创建者
     // 权限: 无
     // 参数: _openning 资金池状态
@@ -107,7 +111,7 @@ contract CoinPool{
     }
 
     function transferTBT(address to,uint256 _amount) external onlyGamer{
-        tbt.transferFrom(msg.sender, to, _amount);
+        tbt.transferFrom(owner, to, _amount);
     }
 
     // 充值, 向合约转账即表示向合约充值. 玩家失败后, 或者想增加资金数, 由此向合约充值.

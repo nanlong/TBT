@@ -37,10 +37,10 @@ contract Game{
     function bet(uint256 betType) external payable{
         if (msg.tokenid == tokenIdRTRX){
             require(msg.tokenvalue >= 20e6 && msg.tokenvalue < address(_CoinPool).balance/10);
-            _CoinPool.transferTBT(ibet.player, msg.tokenvalue*1e9);
+            _CoinPool.transferTBT(msg.sender, msg.tokenvalue*1e9);
         }else{
             require(msg.value >= 20e6 && msg.value < address(_CoinPool).balance/10);
-            _CoinPool.transferTBT(ibet.player, msg.value*1e9);
+            _CoinPool.transferTBT(msg.sender, msg.value*1e9);
         }
 
         uint256 last = BetRecord.length;
@@ -57,11 +57,12 @@ contract Game{
     // 返回: (输赢,注数)
     function isWin(BetStruct storage ibet) private view returns (bool, uint256) {
         uint256 bhash = uint256(blockhash(ibet.blockNumber));
-        while ((bhash & 0xf) > 10) {
+        while ((bhash & 0xf) >= 10) {
             bhash >>= 4;
         }
         uint256 betType = ibet.betType;
-        if (((betType>>(bhash&0xf))&0xff)==0)
+        uint256 offset = (bhash&0xf)*8;
+        if (((betType>>offset)&0xff)==0)
             return (false, 0);
         uint256 n = 0;
         for(uint256 i = 0; i < 10; i++){
@@ -135,11 +136,12 @@ contract Game{
     function nwin() public view returns(bool, uint256, bytes32, uint256, bytes32) {
         BetStruct storage ibet = BetRecord[0];
         uint256 bhash = uint256(blockhash(ibet.blockNumber));
-        while ((bhash & 0xf) > 10) {
+        while ((bhash & 0xf) >= 10) {
             bhash >>= 4;
         }
         uint256 betType = ibet.betType;
-        if (((betType>>(bhash&0xf))&0xff)==0)
+        uint256 offset = (bhash&0xf)*8;
+        if (((betType>>offset)&0xff)==0)
             return (false, 10000, blockhash(ibet.blockNumber), bhash&0xf,blockhash(ibet.blockNumber));
         uint256 n = 0;
         for(uint256 i = 0; i < 10; i++){
@@ -149,28 +151,9 @@ contract Game{
         }
         return (n>0, n, blockhash(ibet.blockNumber), bhash&0xf,blockhash(ibet.blockNumber));
     }
-/*
-    function win() public view returns(bool, uint256) {
-        BetStruct storage ibet = BetRecord[0];
-        uint256 bhash = uint256(blockhash(ibet.blockNumber));
-        while ((bhash & 0xf) > 10) {
-            bhash >>= 4;
-        }
-        uint256 betType = ibet.betType;
-        if (((betType>>(bhash&0xf))&0xff)==0)
-            return (false, 0);
-        uint256 n = 0;
-        for(uint256 i = 0; i < 10; i++){
-            if (betType&0xff > 0)
-                n++;
-            betType>>=8;  
-        }
-        return (n > 0, n);
-    }
-*/
 
-    function open() public view returns(string, uint256, bool, uint256){
-        BetStruct storage ibet = BetRecord[0];
+    function xopen(uint256 num) public view returns(string, uint256, bool, uint256){
+        BetStruct storage ibet = BetRecord[num];
         (bool win, uint256 n) = isWin(ibet);
         if(win){
             if(ibet.betValue > 0){
