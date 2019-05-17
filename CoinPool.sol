@@ -27,7 +27,7 @@ contract CoinPool{
     // mustOpen 表示只有资金池处于打开状态, 并且对应的game允许动用资金, 才可以通过
     modifier onlyGamer(){require(openning==true&&games[msg.sender]==true);_;}
 
-    function swithcTBT(TRC20 _tbt) public{
+    function swithcTBT(TRC20 _tbt) public onlyOwner{
         tbt = _tbt;
     }
 

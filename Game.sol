@@ -11,10 +11,7 @@ contract Game{
     uint256 public tokenIdRTRX;
     struct BetStruct {
         address player; // 下注者
-        uint256 blockNumber; // 下注区块号
-        uint256 betType; // 0-9: bet0~bet9 10:small 11:big 12:even 13:odd
-        uint256 tokenValue; // 下注金额
-        uint256 betValue; // 下注金额
+        uint256 betInfoEn; //
     }
     event betLog(address player, uint256 betType, uint256 betValue, uint256 tokenValue);
     event openLog(address player, uint256 betType, uint256 betValue, uint256 tokenValue, bool win);
@@ -34,34 +31,48 @@ contract Game{
     function switchTokenID(uint256 tokenID) external onlyOwner{
         tokenIdRTRX = tokenID;
     }
+    function encode(uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint256 betType)internal pure returns(uint256){
+        require(trxvalue < (1<<(8*8)) && rtrxvalue < (1<<(8*8)) && number < (1<<(13*8)));
+        uint256 value = trxvalue;
+        uint256 flag = 0;
+        if (rtrxvalue > 0) {
+            value = rtrxvalue;
+            flag = 1<<((8)*8);
+        }
+        return betType<<(22*8)|number<<(9*8)|flag|value;
+    }
+    function decode(uint256 en) internal pure returns(uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint256 betType){
+        trxvalue = rtrxvalue = 0;
+        if ((en & (1<<(8*8))) > 0)
+            rtrxvalue = en & ((1<<(8*8))-1);
+        else
+            trxvalue = en & ((1<<(8*8))-1);
+        number = (en >> (9*8))& ((1<<(13*8))-1);
+        betType = en >> (22*8);
+    }
     function bet(uint256 betType) external payable{
         if (msg.tokenid == tokenIdRTRX){
             require(msg.tokenvalue >= 20e6 && msg.tokenvalue < address(_CoinPool).balance/10);
-            _CoinPool.transferTBT(msg.sender, msg.tokenvalue*1e9);
+            _CoinPool.transferTBT(msg.sender, msg.tokenvalue*1e9); // big gas 352110 sun
         }else{
             require(msg.value >= 20e6 && msg.value < address(_CoinPool).balance/10);
-            _CoinPool.transferTBT(msg.sender, msg.value*1e9);
+            _CoinPool.transferTBT(msg.sender, msg.value*1e9); // big gas
         }
 
         uint256 last = BetRecord.length;
         BetRecord.length++;
         BetStruct storage ibet = BetRecord[last];
-        ibet.blockNumber = block.number;
-        ibet.betType = betType;
-        ibet.betValue = msg.value;
         ibet.player = msg.sender;
-        ibet.tokenValue = msg.tokenvalue;
-        emit betLog(ibet.player, ibet.betType, ibet.betValue, ibet.tokenValue);
+        ibet.betInfoEn = encode(msg.value, msg.tokenvalue, block.number, betType); // encode: small gas 3820 sun
+        emit betLog(ibet.player, betType, msg.value, msg.tokenvalue); // gas 19170 sun
     }
 
     // 返回: (输赢,注数)
-    function isWin(BetStruct storage ibet) private view returns (bool, uint256) {
-        uint256 bhash = uint256(blockhash(ibet.blockNumber));
-        while ((bhash & 0xf) >= 10) {
-            bhash >>= 4;
+    function isWin(uint256 betType, uint256 betHash) private pure returns (bool, uint256) {
+        while ((betHash & 0xf) >= 10) {
+            betHash >>= 4;
         }
-        uint256 betType = ibet.betType;
-        uint256 offset = (bhash&0xf)*8;
+        uint256 offset = (betHash&0xf)*8;
         if (((betType>>offset)&0xff)==0)
             return (false, 0);
         uint256 n = 0;
@@ -77,53 +88,57 @@ contract Game{
         open(BetRecord.length);
     }
 
-    function dealTRX(BetStruct storage ibet, bool win, uint256 n) internal {
+    function dealTRX(address player, uint256 trxvalue, bool win, uint256 n) internal {
         if (!win){ // loose, transfer TRX to coinpool
-            address(_CoinPool).transfer(ibet.betValue);
+            address(_CoinPool).transfer(trxvalue);
             return;
         }
-        uint256 total = ibet.betValue*970/100/n;
-        if (total > ibet.betValue){
-            ibet.player.transfer(ibet.betValue);
-            _CoinPool.transfer(ibet.player, total - ibet.betValue);
+        uint256 total = trxvalue*970/100/n;
+        if (total > trxvalue){
+            player.transfer(trxvalue);
+            _CoinPool.transfer(player, total - trxvalue);
         }else{
-            ibet.player.transfer(total);
-            address(_CoinPool).transfer(ibet.betValue-total);
+            player.transfer(total);
+            address(_CoinPool).transfer(trxvalue-total);
         }
     }
 
-    function dealRTRX(BetStruct storage ibet, bool win, uint256 n) internal {
+    function dealRTRX(address player, uint256 rtrxvalue, bool win, uint256 n) internal {
         if (!win){ // loose, transfer RTRX to coinpool
-            address(_CoinPool).transferToken(ibet.tokenValue, tokenIdRTRX);
+            address(_CoinPool).transferToken(rtrxvalue, tokenIdRTRX);
             return;
         }
-        uint256 total = ibet.tokenValue*970/100/n;
-        if (total > ibet.tokenValue){
-            ibet.player.transferToken(ibet.tokenValue, tokenIdRTRX);
-            _CoinPool.transfer(ibet.player, total - ibet.tokenValue);
+        uint256 total = rtrxvalue*970/100/n;
+        if (total > rtrxvalue){
+            player.transferToken(rtrxvalue, tokenIdRTRX);
+            _CoinPool.transfer(player, total - rtrxvalue);
         }else{
-            ibet.player.transferToken(ibet.tokenValue, total);
-            address(_CoinPool).transferToken(total-ibet.tokenValue, tokenIdRTRX);
+            player.transferToken(rtrxvalue, total);
+            address(_CoinPool).transferToken(total-rtrxvalue, tokenIdRTRX);
         }
     }
 
     function open(uint256 num) public{
-        require(BetRecord.length > 0 && BetRecord[0].blockNumber < block.number);
+        require(BetRecord.length > 0);
         uint256 end = num+nextOpen;
         if (end > BetRecord.length)
             end = BetRecord.length;
         uint256 i = 0;
+        uint256 betHash;
+        uint256 betNumber = 0;
         for(i = nextOpen; i < end; i++){
             BetStruct storage ibet = BetRecord[i];
-            if (ibet.blockNumber >= block.number)
+            (uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint256 betType) = decode(ibet.betInfoEn);
+            if (number >= block.number)
                 break;
-
-            (bool win, uint256 n) = isWin(ibet);
-            if(ibet.betValue > 0)
-                dealTRX(ibet, win, n);
+            if (betNumber != number)
+                betHash = uint256(blockhash(number));
+            (bool win, uint256 n) = isWin(betType, betHash);
+            if(trxvalue > 0)
+                dealTRX(ibet.player, trxvalue, win, n);
             else
-                dealRTRX(ibet, win, n);
-            emit openLog(ibet.player, ibet.betType, ibet.betValue, ibet.tokenValue, win);
+                dealRTRX(ibet.player, rtrxvalue, win, n);
+            emit openLog(ibet.player, betType, trxvalue, rtrxvalue, win);
         }
         if (i == BetRecord.length){
             nextOpen = 0;
@@ -135,46 +150,40 @@ contract Game{
 
     function nwin() public view returns(bool, uint256, bytes32, uint256, bytes32) {
         BetStruct storage ibet = BetRecord[0];
-        uint256 bhash = uint256(blockhash(ibet.blockNumber));
+        (uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint256 betType) = decode(ibet.betInfoEn);
+        uint256 bhash = uint256(blockhash(number));
         while ((bhash & 0xf) >= 10) {
             bhash >>= 4;
         }
-        uint256 betType = ibet.betType;
         uint256 offset = (bhash&0xf)*8;
         if (((betType>>offset)&0xff)==0)
-            return (false, 10000, blockhash(ibet.blockNumber), bhash&0xf,blockhash(ibet.blockNumber));
+            return (false, 10000, blockhash(number), bhash&0xf,blockhash(number));
         uint256 n = 0;
         for(uint256 i = 0; i < 10; i++){
             if (betType&0xff > 0)
                 n++;
-            betType>>=8;  
+            betType>>=8;
         }
-        return (n>0, n, blockhash(ibet.blockNumber), bhash&0xf,blockhash(ibet.blockNumber));
+        return (n>0, n, blockhash(number), bhash&0xf,blockhash(number));
     }
 
     function xopen(uint256 num) public view returns(string, uint256, bool, uint256){
         BetStruct storage ibet = BetRecord[num];
-        (bool win, uint256 n) = isWin(ibet);
+        (uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint256 betType) = decode(ibet.betInfoEn);
+        uint256 betHash = uint256(blockhash(number));
+        (bool win, uint256 n) = isWin(betType, betHash);
         if(win){
-            if(ibet.betValue > 0){
-                return ("win trx", ibet.betValue*970/100/n, win, n);
-                //ibet.player.transfer(ibet.betValue);
-                //_CoinPool.transfer(ibet.player, ibet.betValue*970/100/n);
+            if(trxvalue > 0){
+                return ("win trxvalue", trxvalue*970/100/n, win, n);
             }else{
-                return ("win trc10", ibet.tokenValue*970/100/n, win, n);
-                //ibet.player.transferToken(ibet.tokenValue, tokenIdRTRX);
-                //_CoinPool.transferToken(ibet.player, ibet.tokenValue*970/100/n, tokenIdRTRX);
+                return ("win trc10", rtrxvalue*970/100/n, win, n);
             }
-            //emit openLog(ibet.player, ibet.betType, ibet.betValue, ibet.tokenValue, true);
         }else{
-            if(ibet.betValue > 0){
-                return ("lose trx", ibet.betValue, win, n);
-                //address(_CoinPool).transfer(ibet.betValue);
+            if(trxvalue > 0){
+                return ("lose trxvalue", rtrxvalue, win, n);
             }else{
-                return ("lose trc10", ibet.tokenValue, win, n);
-                //address(_CoinPool).transferToken(ibet.tokenValue, tokenIdRTRX);
+                return ("lose trc10", rtrxvalue, win, n);
             }
-            //emit openLog(ibet.player, ibet.betType, ibet.betValue, ibet.tokenValue, false);
         }
     }
 
