@@ -1,11 +1,18 @@
 pragma solidity >=0.4.0;
+
 contract CoinPool{
+    uint256 public tokenIdRTRX;
+    address public  owner;
+    function isOpen() external view returns(bool);
     function transfer(address to, uint256 _amount) external;
     function transferTBT(address to,uint256 _amount)external;
     function ()payable external;
 }
 
 contract Game{
+    function isWin(uint256 betType, uint256 betHash) internal pure returns (bool, uint256);
+
+    string public name;
     address public owner;
     CoinPool public  _CoinPool;
     uint256 public tokenIdRTRX;
@@ -16,20 +23,25 @@ contract Game{
     event betLog(address player, uint256 betType, uint256 betValue, uint256 tokenValue);
     event openLog(address player, uint256 betType, uint256 betValue, uint256 tokenValue, bool win);
     uint256 public nextOpen;
+    bool public opening;
     BetStruct[] public BetRecord;
 
     modifier onlyOwner(){require(msg.sender==owner);_;}
-    constructor(address pool, uint256 tokenID)public{
-        owner = msg.sender;
+    modifier gameOpened(){require(opening);_;}
+    constructor(string _name, address pool)public{
+        name = _name;
         _CoinPool = CoinPool(pool);
+        update();
         nextOpen = 0;
-        tokenIdRTRX = tokenID;
+    }
+    function update() public {
+        owner = _CoinPool.owner();
+        tokenIdRTRX = _CoinPool.tokenIdRTRX();
+        opening = _CoinPool.isOpen();
     }
     function switchCoinPool(address pool) external onlyOwner{
         _CoinPool = CoinPool(pool);
-    }
-    function switchTokenID(uint256 tokenID) external onlyOwner{
-        tokenIdRTRX = tokenID;
+        update();
     }
     function encode(uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint256 betType)internal pure returns(uint256){
         require(trxvalue < (1<<(8*8)) && rtrxvalue < (1<<(8*8)) && number < (1<<(13*8)));
@@ -50,7 +62,7 @@ contract Game{
         number = (en >> (9*8))& ((1<<(13*8))-1);
         betType = en >> (22*8);
     }
-    function bet(uint256 betType) external payable{
+    function bet(uint256 betType) external payable gameOpened{
         if (msg.tokenid == tokenIdRTRX){
             require(msg.tokenvalue >= 20e6 && msg.tokenvalue < address(_CoinPool).balance/10);
             _CoinPool.transferTBT(msg.sender, msg.tokenvalue*1e9); // big gas 352110 sun
@@ -65,23 +77,6 @@ contract Game{
         ibet.player = msg.sender;
         ibet.betInfoEn = encode(msg.value, msg.tokenvalue, block.number, betType); // encode: small gas 3820 sun
         emit betLog(ibet.player, betType, msg.value, msg.tokenvalue); // gas 19170 sun
-    }
-
-    // 返回: (输赢,注数)
-    function isWin(uint256 betType, uint256 betHash) private pure returns (bool, uint256) {
-        while ((betHash & 0xf) >= 10) {
-            betHash >>= 4;
-        }
-        uint256 offset = (betHash&0xf)*8;
-        if (((betType>>offset)&0xff)==0)
-            return (false, 0);
-        uint256 n = 0;
-        for(uint256 i = 0; i < 10; i++){
-            if (betType&0xff > 0)
-                n++;
-            betType>>=8;  
-        }
-        return (n > 0, n);
     }
 
     function openall() external{
@@ -146,25 +141,6 @@ contract Game{
         }else{
             nextOpen = i;
         }
-    }
-
-    function nwin() public view returns(bool, uint256, bytes32, uint256, bytes32) {
-        BetStruct storage ibet = BetRecord[0];
-        (uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint256 betType) = decode(ibet.betInfoEn);
-        uint256 bhash = uint256(blockhash(number));
-        while ((bhash & 0xf) >= 10) {
-            bhash >>= 4;
-        }
-        uint256 offset = (bhash&0xf)*8;
-        if (((betType>>offset)&0xff)==0)
-            return (false, 10000, blockhash(number), bhash&0xf,blockhash(number));
-        uint256 n = 0;
-        for(uint256 i = 0; i < 10; i++){
-            if (betType&0xff > 0)
-                n++;
-            betType>>=8;
-        }
-        return (n>0, n, blockhash(number), bhash&0xf,blockhash(number));
     }
 
     function xopen(uint256 num) public view returns(string, uint256, bool, uint256){

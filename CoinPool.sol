@@ -5,64 +5,100 @@ contract TRC20 {
     function transferFrom(address from, address to, uint tokens) public returns (bool success);
 }
 
+contract Game{
+    function update() public;
+}
+
 contract CoinPool{
+    enum GameStatus{NONE,CLOSE,OPEN}
     // owner 合约拥有者, 拥有合约所有的权限. owner为合约创建者, 暂不支持更改.
     // 一定要保存好owner的私钥, 做好备份并禁止泄露.
     address public  owner;
     // 资金池总开关. true:表示打开, false:表示锁定.
     // 锁定状态下所有Game都无法动用资金. owner提现不受限制.
-    bool public openning;
+    bool public opening;
     // key:游戏合约地址
     // value:是否允许动用资金 true:允许 false:禁止
-    mapping(address=>bool) public games;
+    mapping(address=>GameStatus) public games;
+    Game[] public gamelist;
     // 杠杆比率, 即游戏合约转账必须满足 transferAmount * leverRadio <= poolBalance
     // 比如资金池资金(poolBalance)=100, 杠杆比率(leverRadio)=10, 则游戏合约每次最多只能转账(transferAmount) = 10
     // 如果超过这个限度, 则转账失败, 不会发生任何的资金变动.
     uint256 public leverRadio;
 
     TRC20 public tbt;
+    uint256 public tokenIdRTRX;
 
     // onlyOnwer 表示只有owner才可以调用此方法
     modifier onlyOwner(){require(msg.sender==owner);_;}
     // mustOpen 表示只有资金池处于打开状态, 并且对应的game允许动用资金, 才可以通过
-    modifier onlyGamer(){require(openning==true&&games[msg.sender]==true);_;}
-
-    function swithcTBT(TRC20 _tbt) public onlyOwner{
-        tbt = _tbt;
-    }
+    modifier onlyGamer(){require(opening==true&&games[msg.sender]==GameStatus.OPEN);_;}
 
     // 创建合约,设置owner为创建者
     // 权限: 无
     // 参数: _openning 资金池状态
     //      _leverRadio 资金比率
-    constructor(bool _openning, uint256 _leverRadio, TRC20 _tbt) public{
+    constructor(bool _openning, uint256 _leverRadio, TRC20 _tbt, uint256 tokenid) public{
         owner = msg.sender;
-        openning = _openning;
+        opening = _openning;
         leverRadio = _leverRadio;
         tbt = _tbt;
+        tokenIdRTRX = tokenid;
+    }
+
+    function isOpen() external view returns(bool){
+        return opening && games[msg.sender]==GameStatus.OPEN;
+    }
+
+    function switchTBT(TRC20 _tbt) public onlyOwner{
+        tbt = _tbt;
+    }
+
+    function switchRTRX(uint256 token)public onlyOwner{
+        tokenIdRTRX = token;
+    }
+    
+    function update(uint256 start, uint256 end) public onlyOwner {
+        for(uint256 i = start; i < end; i++){
+            gamelist[i].update();
+        }
+    }
+
+    function updateAll() public onlyOwner{
+        update(0, gamelist.length);
+    }
+
+    function gameCount() external view returns(uint256){
+        return gamelist.length;
     }
     // 增加游戏合约地址,增加后该合约即可以使用资金(在资金池解锁的状态下)
     // 权限: owner
     // 参数: _game 游戏合约地址
-    function addGame(address _game) external onlyOwner{
-        games[_game] = true;
+    function addGame(Game _game) external onlyOwner{
+        if(games[address(_game)] == GameStatus.NONE)
+            gamelist.push(_game);
+        games[address(_game)] = GameStatus.OPEN;
+        _game.update();
     }
     // 停止某个游戏合约, 停止后该合约即无法使用资金
     // 权限: owner
     // 参数: _game 停止的游戏合约地址
-    function stopGame(address _game) external onlyOwner{
-        games[_game] = false;
+    function stopGame(Game _game) external onlyOwner{
+        games[address(_game)] = GameStatus.CLOSE;
+        _game.update();
     }
 
     // 冻结资金池, 所有的游戏均无法使用资金
     // 权限: owner
     function lock() external onlyOwner{
-        openning = false;
+        opening = false;
+        updateAll();
     }
     // 解锁资金池
     // 权限: owner
     function unlock() external onlyOwner{
-        openning = true;
+        opening = true;
+        updateAll();
     }
 
     // 修改资金比率
