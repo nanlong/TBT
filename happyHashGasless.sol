@@ -23,18 +23,18 @@ contract HappyHash is Game{
         return (n>0, n, blockhash(number), betHash&0xf);
     }
     // 返回: (输赢,注数)
-    function isWin(uint256 betType, uint256 betHash) internal pure returns (bool, uint256) {
+    function isWin(uint256 betType, uint256 betHash, uint256 betValue) internal pure returns (uint256) {
         while ((betHash & 0xf) >= 10) {
             betHash >>= 4;
         }
         uint256 winFlag = 1<<(betHash&0xf);
         if ((betType & winFlag)==0)
-            return (false, 0);
+            return 0;
         uint256 n = 0;
 		while (betType > 0) {
 			n++;
 			betType &= betType - 1;
 		}
-        return (n > 0, n);
+        return n>0 ? betValue*970/100/n : 0;
     }
 }
