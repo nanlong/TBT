@@ -23,7 +23,8 @@ contract Game{
     event openLog(address player, uint256 betType, uint256 betValue, uint256 tokenValue, bool win);
     uint256 public nextOpen;
     bool public opening;
-    BetStruct[] public BetRecord;
+    BetStruct[16] public BetRecord;
+    BetStruct[] public BetRecordExtend;
 
     modifier onlyOwner(){require(msg.sender==owner);_;}
     modifier gameOpened(){require(opening);_;}
@@ -41,6 +42,18 @@ contract Game{
     function switchCoinPool(address pool) external onlyOwner{
         _CoinPool = CoinPool(pool);
         update();
+    }
+    function getFreeSlot() internal returns(BetStruct storage ibet){
+        if (true || BetRecord[BetRecord.length-1].betInfoEn > 0){
+            BetRecordExtend.length++;
+            return BetRecordExtend[BetRecordExtend.length-1];
+        }
+        for(uint256 i = 0; i < BetRecord.length; i++){
+            ibet = BetRecord[i];
+            if (ibet.betInfoEn == 0)
+                break;
+        }
+        return ibet;
     }
     function encode(address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint256 betType)internal pure returns(uint256){
         require(trxvalue < ((1<<31)*1e6) && 
@@ -74,16 +87,15 @@ contract Game{
             require(msg.value >= 20e6 && msg.value < address(_CoinPool).balance/10);
             _CoinPool.transferTBT(msg.sender, msg.value*1e9); // big gas
         }
-
-        uint256 last = BetRecord.length;
-        BetRecord.length++;
-        BetStruct storage ibet = BetRecord[last];
+        BetStruct storage ibet = getFreeSlot();
         ibet.betInfoEn = encode(msg.sender, msg.value, msg.tokenvalue, block.number, betType); // encode: small gas 3820 sun
         emit betLog(msg.sender, betType, msg.value, msg.tokenvalue); // gas 19170 sun
     }
 
     function openall() external{
-        open(BetRecord.length);
+        openFixedRecord();
+        if(BetRecord.length > 0)
+            openExtendRecord(BetRecord.length);
     }
 
     function dealTRX(address player, uint256 trxvalue, bool win, uint256 n) internal {
@@ -116,16 +128,40 @@ contract Game{
         }
     }
 
-    function open(uint256 num) public{
-        require(BetRecord.length > 0);
+    function openFixedRecord() public {
+        uint256 betHash;
+        uint256 betNumber = 0;
+        for(uint256 i = 0; i < BetRecord.length; i++){
+            BetStruct storage ibet = BetRecord[i];
+            if (ibet.betInfoEn == 0){
+                break;
+            }
+            (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint256 betType) = decode(ibet.betInfoEn);
+            if (number >= block.number)
+                break;
+            if (betNumber != number)
+                betHash = uint256(blockhash(number));
+            (bool win, uint256 n) = isWin(betType, betHash);
+            if(trxvalue > 0)
+                dealTRX(player, trxvalue, win, n);
+            else
+                dealRTRX(player, rtrxvalue, win, n);
+            emit openLog(player, betType, trxvalue, rtrxvalue, win);
+            delete BetRecord[i];
+        }
+    }
+
+    function openExtendRecord(uint256 num) public{
+        if (BetRecordExtend.length == 0)
+            return;
         uint256 end = num+nextOpen;
-        if (end > BetRecord.length)
-            end = BetRecord.length;
+        if (end > BetRecordExtend.length)
+            end = BetRecordExtend.length;
         uint256 i = 0;
         uint256 betHash;
         uint256 betNumber = 0;
         for(i = nextOpen; i < end; i++){
-            BetStruct storage ibet = BetRecord[i];
+            BetStruct storage ibet = BetRecordExtend[i];
             (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint256 betType) = decode(ibet.betInfoEn);
             if (number >= block.number)
                 break;
@@ -138,30 +174,35 @@ contract Game{
                 dealRTRX(player, rtrxvalue, win, n);
             emit openLog(player, betType, trxvalue, rtrxvalue, win);
         }
-        if (i == BetRecord.length){
+        if (i == BetRecordExtend.length){
             nextOpen = 0;
-            delete BetRecord;
+            delete BetRecordExtend;
         }else{
             nextOpen = i;
         }
     }
 
-    function xopen(uint256 num) public view returns(string, address, uint256, bool, uint256){
-        BetStruct storage ibet = BetRecord[num];
+    function xopen(uint256 num) public view returns(address, uint256, bool, uint256){
+        BetStruct memory ibet;
+        if (num < BetRecord.length){
+            ibet = BetRecord[num];
+        }else {
+            ibet = BetRecordExtend[num - BetRecord.length];
+        }
         (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint256 betType) = decode(ibet.betInfoEn);
         uint256 betHash = uint256(blockhash(number));
         (bool win, uint256 n) = isWin(betType, betHash);
         if(win){
             if(trxvalue > 0){
-                return ("win trxvalue", player, trxvalue*970/100/n, win, n);
+                return (player, trxvalue*970/100/n, win, n);
             }else{
-                return ("win trc10", player, rtrxvalue*970/100/n, win, n);
+                return (player, rtrxvalue*970/100/n, win, n);
             }
         }else{
             if(trxvalue > 0){
-                return ("lose trxvalue", player, rtrxvalue, win, n);
+                return (player, rtrxvalue, win, n);
             }else{
-                return ("lose trc10", player, rtrxvalue, win, n);
+                return (player, rtrxvalue, win, n);
             }
         }
     }
@@ -180,7 +221,13 @@ contract Game{
 
 
     function gbetNum() external view returns(uint256){
-        return BetRecord.length;
+        uint256 n = 0;
+        for(uint256 i = 0; i < BetRecord.length; i++){
+            if (BetRecord[i].betInfoEn == 0)
+                break;
+            n++;
+        }
+        return n+BetRecordExtend.length;
     }
 
     function gblockhash(uint256 number) public view returns (bytes32, bytes1, uint256){
