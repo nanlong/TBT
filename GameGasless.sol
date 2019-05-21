@@ -10,7 +10,7 @@ contract CoinPool{
 }
 
 contract Game{
-    function isWin(uint256 betType, uint256 betHash, uint256  betValue) internal pure returns (uint256);
+    function isWin(uint32 betType, uint256 betHash, uint256 betValue) internal pure returns (uint256);
 
     string public name;
     address public owner;
@@ -55,11 +55,10 @@ contract Game{
         }
         return ibet;
     }
-    function encode(address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint256 betType)internal pure returns(uint256){
+    function encode(address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType)internal pure returns(uint256){
         require(trxvalue < ((1<<31)*1e6) && 
                 rtrxvalue < ((1<<31)*1e6) && 
                 number < (1<<32) &&
-                betType < (1<<32) &&
                 uint256(player) < (1<<160));
         uint256 value = trxvalue/1e6;
         if (rtrxvalue > 0) {
@@ -68,7 +67,7 @@ contract Game{
         }
         return uint256(player)<<(12*8) | value<<(8*8) | number<<(4*8) | betType;
     }
-    function decode(uint256 en) internal pure returns(address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint256 betType){
+    function decode(uint256 en) internal pure returns(address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType){
         player = address(en >> (12*8));
         trxvalue = rtrxvalue = 0;
         uint256 value = (en >> (8*8));
@@ -77,9 +76,9 @@ contract Game{
         else
             trxvalue = (value & ((1<<31) - 1))*1e6;
         number = (en >> (4*8)) & ((1<<32) - 1);
-        betType = en & ((1<<32) - 1);
+        betType = uint32(en);
     }
-    function bet(uint256 betType) external payable gameOpened{
+    function bet(uint32 betType) external payable gameOpened{
         if (msg.tokenid == tokenIdRTRX){
             require(msg.tokenvalue >= 20e6 && msg.tokenvalue < address(_CoinPool).balance/10);
             _CoinPool.transferTBT(msg.sender, msg.tokenvalue*1e9); // big gas 352110 sun
@@ -94,14 +93,14 @@ contract Game{
 
     function openall() external{
         openFixedRecord();
-        if(BetRecord.length > 0)
-            openExtendRecord(BetRecord.length);
+        if(BetRecordExtend.length > 0)
+            openExtendRecord(BetRecordExtend.length);
     }
 
     function dealTRX(address player, uint256 betValue, uint256 totalValue) internal {
         address(_CoinPool).transfer(betValue);
         if(totalValue > 0)
-            player.transfer(totalValue);
+            _CoinPool.transfer(player, totalValue);
     }
 
     function dealRTRX(address player, uint256 betValue, uint256 totalValue) internal {
@@ -117,7 +116,7 @@ contract Game{
     }
 
     function openIbet(BetStruct storage ibet, uint256 betNumber, uint256 betHash) internal returns(uint256,uint256) {
-            (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint256 betType) = decode(ibet.betInfoEn);
+            (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint32 betType) = decode(ibet.betInfoEn);
             if (number >= block.number)
                 return(0,0);
             if (betNumber != number)
@@ -181,7 +180,7 @@ contract Game{
         }else {
             ibet = BetRecordExtend[num - BetRecord.length];
         }
-        (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint256 betType) = decode(ibet.betInfoEn);
+        (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint32 betType) = decode(ibet.betInfoEn);
         uint256 betHash = uint256(blockhash(number));
         uint256 betValue = trxvalue > 0 ? trxvalue : rtrxvalue;
         uint256 totalValue = isWin(betType, betHash, betValue);
