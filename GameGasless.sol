@@ -176,7 +176,8 @@ contract Game{
         }
     }
 
-    function xopen(uint256 num) public view returns(address, uint256, uint256, uint256){
+    function xopen(uint256 num) public view returns(bytes32, uint256, uint256, address, uint256, uint256, uint256){
+        // fuck the compiler!
         BetStruct memory ibet;
         if (num < BetRecord.length){
             ibet = BetRecord[num];
@@ -184,10 +185,7 @@ contract Game{
             ibet = BetRecordExtend[num - BetRecord.length];
         }
         (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint32 betType) = decode(ibet.betInfoEn);
-        uint256 openNumber = hashNumber(blockhash(number));
-        uint256 betValue = trxvalue > 0 ? trxvalue : rtrxvalue;
-        uint256 totalValue = isWin(betType, openNumber, betValue);
-        return (player, trxvalue, rtrxvalue, totalValue);
+        return  (blockhash(number), number, hashNumber(blockhash(number)), player, trxvalue, rtrxvalue, isWin(betType, hashNumber(blockhash(number)), trxvalue > 0 ? trxvalue : rtrxvalue));
     }
 
     function withdraw() external onlyOwner {
