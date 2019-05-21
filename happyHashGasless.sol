@@ -8,26 +8,20 @@ contract HappyHash is Game{
     function nwin(uint256 num) public view returns(bool, uint256, bytes32, uint256) {
         BetStruct storage ibet = BetRecord[num];
         (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint256 betType) = decode(ibet.betInfoEn);
-        uint256 betHash = uint256(blockhash(number));
-        while ((betHash & 0xf) >= 10) {
-            betHash >>= 4;
-        }
-        uint256 winFlag = 1<<(betHash&0xf);
+        uint256 openNumber = hashNumber(blockhash(number));
+        uint256 winFlag = 1<<(openNumber&0xf);
         if ((betType & winFlag)==0)
-            return (false, 0, blockhash(number), betHash&0xf);
+            return (false, 0, blockhash(number), openNumber&0xf);
         uint256 n = 0;
 		while (betType > 0) {
 			n++;
 			betType &= betType - 1;
 		}
-        return (n>0, n, blockhash(number), betHash&0xf);
+        return (n>0, n, blockhash(number), openNumber&0xf);
     }
     // 返回: (输赢,注数)
-    function isWin(uint32 betType, uint256 betHash, uint256 betValue) internal pure returns (uint256) {
-        while ((betHash & 0xf) >= 10) {
-            betHash >>= 4;
-        }
-        uint256 winFlag = 1<<(betHash&0xf);
+    function isWin(uint32 betType, uint256 openNumber, uint256 betValue) internal pure returns (uint256 totalValue) {
+        uint256 winFlag = 1<<(openNumber&0xf);
         if ((betType & winFlag)==0)
             return 0;
         uint256 n = 0;
@@ -36,5 +30,17 @@ contract HappyHash is Game{
 			betType &= betType - 1;
 		}
         return n>0 ? betValue*970/100/n : 0;
+    }
+
+    function hashNumber(bytes32 betHash) internal pure returns(uint256 number){
+        number = uint256(betHash);
+        while ((number & 0xf) >= 10) {
+            number >>= 4;
+        }
+        return number&0xf;
+    }
+
+    function bet(uint32 betType) external payable{
+        tibet(betType);
     }
 }
