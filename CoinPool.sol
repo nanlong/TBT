@@ -28,6 +28,7 @@ contract CoinPool{
 
     TRC20 public tbt;
     uint256 public tokenIdRTRX;
+    uint256 public tokenIdTBS;
 
     // onlyOnwer 表示只有owner才可以调用此方法
     modifier onlyOwner(){require(msg.sender==owner);_;}
@@ -38,12 +39,13 @@ contract CoinPool{
     // 权限: 无
     // 参数: _openning 资金池状态
     //      _leverRadio 资金比率
-    constructor(bool _openning, uint256 _leverRadio, TRC20 _tbt, uint256 tokenid) public{
+    constructor(bool _openning, uint256 _leverRadio, TRC20 _tbt, uint256 TBS_ID, uint256 RTRX_ID) public{
         owner = msg.sender;
         opening = _openning;
         leverRadio = _leverRadio;
         tbt = _tbt;
-        tokenIdRTRX = tokenid;
+        tokenIdRTRX = RTRX_ID;
+        tokenIdTBS = TBS_ID;
     }
 
     function isOpen() external view returns(bool){
@@ -146,8 +148,10 @@ contract CoinPool{
         TRC20(trc20).transfer(to, _amount);
     }
 
-    function transferTBT(address to,uint256 _amount) external onlyGamer{
-        tbt.transferFrom(owner, to, _amount);
+    function transferTBTAndTBS(address to,uint256 _TBT, uint256 _TBS) external onlyGamer{
+        //tbt.transferFrom(owner, to, _TBT);
+        tbt.transfer(to, _TBT);
+        to.transferToken(_TBS, tokenIdTBS);
     }
 
     // 充值, 向合约转账即表示向合约充值. 玩家失败后, 或者想增加资金数, 由此向合约充值.

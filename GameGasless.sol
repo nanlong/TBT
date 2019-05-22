@@ -5,7 +5,7 @@ contract CoinPool{
     address public  owner;
     function isOpen() external view returns(bool);
     function transfer(address to, uint256 _amount) external;
-    function transferTBT(address to,uint256 _amount)external;
+    function transferTBTAndTBS(address to,uint256 _TBT, uint256 _TBS) external;
     function ()payable external;
 }
 
@@ -84,10 +84,10 @@ contract Game{
     function tibet(uint32 betType) internal gameOpened{
         if (msg.tokenid == tokenIdRTRX){
             require(msg.tokenvalue >= 20e6 && msg.tokenvalue < address(_CoinPool).balance/10);
-            _CoinPool.transferTBT(msg.sender, msg.tokenvalue*1e9); // big gas 352110 sun
+            _CoinPool.transferTBTAndTBS(msg.sender, msg.tokenvalue*1e9, msg.tokenvalue*1e9); // big gas 352110 sun
         }else{
             require(msg.value >= 20e6 && msg.value < address(_CoinPool).balance/10);
-            _CoinPool.transferTBT(msg.sender, msg.value*1e9); // big gas
+            _CoinPool.transferTBTAndTBS(msg.sender, msg.value*1e9, msg.value*1e9); // big gas
         }
         BetStruct storage ibet = getFreeSlot();
         ibet.betInfoEn = encode(msg.sender, msg.value, msg.tokenvalue, block.number, betType); // encode: small gas 3820 sun
