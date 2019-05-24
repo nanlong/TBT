@@ -14,6 +14,7 @@ contract HappyScratch is Game{
             _hash >>= 4;
         }
         number = _hash&0xf;
+        _hash >>= 4;
         while ((_hash & 0xf) >= 10) {
             _hash >>= 4;
         }
