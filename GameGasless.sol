@@ -84,10 +84,10 @@ contract Game{
     function tibet(uint32 betType) internal gameOpened{
         if (msg.tokenid == tokenIdRTRX){
             require(msg.tokenvalue >= 20e6 && msg.tokenvalue < address(_CoinPool).balance/10);
-            _CoinPool.transferTBTAndTBS(msg.sender, msg.tokenvalue*1e9, msg.tokenvalue*1e9); // big gas 352110 sun
+            _CoinPool.transferTBTAndTBS(msg.sender, msg.tokenvalue*1e9, msg.tokenvalue); // big gas 352110 sun
         }else{
             require(msg.value >= 20e6 && msg.value < address(_CoinPool).balance/10);
-            _CoinPool.transferTBTAndTBS(msg.sender, msg.value*1e9, msg.value*1e9); // big gas
+            _CoinPool.transferTBTAndTBS(msg.sender, msg.value*1e9, msg.value); // big gas
         }
         BetStruct storage ibet = getFreeSlot();
         ibet.betInfoEn = encode(msg.sender, msg.value, msg.tokenvalue, block.number, betType); // encode: small gas 3820 sun
@@ -111,7 +111,7 @@ contract Game{
             player.transferToken(betValue, tokenIdRTRX);
             _CoinPool.transfer(player, totalValue - betValue);
         }else if(totalValue < betValue){
-            player.transferToken(betValue, tokenIdRTRX);
+            player.transferToken(totalValue, tokenIdRTRX);
             address(_CoinPool).transferToken(betValue - totalValue, tokenIdRTRX);
         }else{
             player.transferToken(betValue, tokenIdRTRX);
@@ -200,6 +200,12 @@ contract Game{
         }
     }
 
+    function balanceTRX() external view returns(uint256){
+        return address(this).balance;
+    }
+    function balanceToken(uint256 token) external view returns(uint256){
+        return address(this).tokenBalance(token);
+    }
 
     function gbetNum() external view returns(uint256){
         uint256 n = 0;

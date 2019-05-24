@@ -59,6 +59,10 @@ contract CoinPool{
     function switchRTRX(uint256 token)public onlyOwner{
         tokenIdRTRX = token;
     }
+
+    function switchTBS(uint256 token)public onlyOwner{
+        tokenIdTBS = token;
+    }
     
     function update(uint256 start, uint256 end) public onlyOwner {
         for(uint256 i = start; i < end; i++){
@@ -152,6 +156,13 @@ contract CoinPool{
         //tbt.transferFrom(owner, to, _TBT);
         tbt.transfer(to, _TBT);
         to.transferToken(_TBS, tokenIdTBS);
+    }
+
+    function balanceTRX() external view returns(uint256){
+        return address(this).balance;
+    }
+    function balanceToken(uint256 token) external view returns(uint256){
+        return address(this).tokenBalance(token);
     }
 
     // 充值, 向合约转账即表示向合约充值. 玩家失败后, 或者想增加资金数, 由此向合约充值.
