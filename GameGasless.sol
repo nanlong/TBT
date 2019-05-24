@@ -112,7 +112,7 @@ contract Game{
             _CoinPool.transfer(player, totalValue - betValue);
         }else if(totalValue < betValue){
             player.transferToken(betValue, tokenIdRTRX);
-            address(_CoinPool).transferToken(totalValue-betValue, tokenIdRTRX);
+            address(_CoinPool).transferToken(betValue - totalValue, tokenIdRTRX);
         }else{
             player.transferToken(betValue, tokenIdRTRX);
         }
@@ -219,6 +219,4 @@ contract Game{
     function curblock() public view returns (bytes32, bytes1, uint256){
         return gblockhash(block.number-1);
     }
-
-    function ()payable external{}
 }
