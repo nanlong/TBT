@@ -22,7 +22,7 @@ contract Game{
     struct BetStruct {
         uint256 betInfoEn; //
     }
-    event betLog(uint256 id);
+    event betLog(bytes32 id);
     //event openLog(uint256 id, uint256 totalValue);
     uint256 public nextOpen;
     bool public opening;
@@ -105,7 +105,7 @@ contract Game{
         }
         BetStruct storage ibet = getFreeSlot();
         ibet.betInfoEn = encode(msg.sender, msg.value, msg.tokenvalue, block.number, betType); // encode: small gas 3820 sun
-        emit betLog(ibet.betInfoEn); // gas 19170 sun
+        emit betLog(bytes32(ibet.betInfoEn)); // gas 19170 sun
     }
 
     function openall() external{
