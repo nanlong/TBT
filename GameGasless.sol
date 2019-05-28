@@ -207,9 +207,9 @@ contract Game{
         (player, trxvalue, rtrxvalue, number, betType) = decode(id);
         if(hashnum > 0)
             hashbyte = bytes32(hashnum);
-        if(bytes32(hashbyte) == 0)
+        if(uint256(hashbyte) == 0)
             hashbyte = blockhash(number);
-        if(bytes32(hashbyte) == 0)
+        if(uint256(hashbyte) == 0)
             hashbyte == Hashes[number];
         openNumber = hashNumber(hashbyte);
         winvalue = isWin(betType, openNumber, trxvalue>0?trxvalue:rtrxvalue);
