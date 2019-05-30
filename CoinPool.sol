@@ -167,5 +167,5 @@ contract CoinPool{
 
     // 充值, 向合约转账即表示向合约充值. 玩家失败后, 或者想增加资金数, 由此向合约充值.
     // 权限: 无
-    function()payable external{}
+    function()external payable{}
 }
