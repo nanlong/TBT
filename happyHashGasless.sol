@@ -5,22 +5,9 @@ import "game.sol";
 contract HappyHash is Game{
     constructor(string _name, address pool) Game(_name,pool) public{}
 
-    function nwin(uint256 num) public view returns(bool, uint256, bytes32, uint256) {
-        BetStruct storage ibet = BetRecord[num];
-        (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint256 betType) = decode(ibet.betInfoEn);
-        uint256 openNumber = hashNumber(blockhash(number));
-        uint256 winFlag = 1<<(openNumber);
-        if ((betType & winFlag)==0)
-            return (false, 0, blockhash(number), openNumber);
-        uint256 n = 0;
-		while (betType > 0) {
-			n++;
-			betType &= betType - 1;
-		}
-        return (n>0, n, blockhash(number), openNumber);
-    }
     // 返回: (输赢,注数)
     function isWin(uint32 betType, uint256 openNumber, uint256 betValue) internal pure returns (uint256 totalValue) {
+        betType = betType&(0x3ff);
         uint256 winFlag = 1<<(openNumber&0xf);
         if ((betType & winFlag)==0)
             return 0;

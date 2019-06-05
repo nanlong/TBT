@@ -172,12 +172,7 @@ contract Game{
             if (betNumber == 0)
                 break;
         }
-        if (i == BetRecordExtend.length){
-            nextOpen = 0;
-            delete BetRecordExtend;
-        }else{
-            nextOpen = i;
-        }
+        nextOpen = i;
     }
 
     function openExtendRecordMan(uint256 start, uint256 end) public onlyOwner{
@@ -218,6 +213,27 @@ contract Game{
 
     function preopen(uint256 id) public view  returns(bytes32 rid, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 trxvalue, uint256 rtrxvalue, uint256 winvalue){
         return preopenWithHash(id, 0);
+    }
+
+    function getMyRecord() public view returns(bytes32 id, bytes32 _hash, uint256 rtx, uint256 rtrx){
+        if (BetRecordExtend.length > 0){
+            uint256 limit = 0;
+            if(BetRecordExtend.length > 256)
+                limit = BetRecordExtend.length - 256;
+            for(uint256 i = BetRecordExtend.length - 1; i >= limit; i--){
+                uint256 bid = BetRecordExtend[i].betInfoEn;
+                (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType) = decode(bid);
+                trxvalue;rtrxvalue;betType;
+                if (player == msg.sender){
+                    return (bytes32(bid), getHashByNumber(number), msg.sender.balance, msg.sender.tokenBalance(tokenIdRTRX));
+                }
+            }
+        }
+        return (0,0, msg.sender.balance, msg.sender.tokenBalance(tokenIdRTRX));
+    }
+
+    function getMyBalance() public view returns(uint256 rtx, uint256 rtrx) {
+        return (msg.sender.balance, msg.sender.tokenBalance(tokenIdRTRX));
     }
 
     function withdraw() external onlyOwner {
