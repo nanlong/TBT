@@ -6,6 +6,7 @@ contract TRC20 {
 }
 
 contract Game{
+    string public name;
     function update() public;
 }
 
