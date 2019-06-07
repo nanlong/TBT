@@ -52,11 +52,15 @@ contract Game{
         Hashes[number] = bytes32(_hash);
     }
 
-    function getHashByNumber(uint256 number)internal view returns (bytes32 _hash){
+    function getHashByNumberUnsafe(uint256 number) internal view returns (bytes32 _hash){
         _hash = blockhash(number);
         if(uint256(_hash) > 0)
             return;
         _hash = Hashes[number];
+    }
+
+    function getHashByNumberSafe(uint256 number)internal view returns (bytes32 _hash){
+        _hash = getHashByNumberUnsafe(number);
         require(uint256(_hash) > 0);
     }
 
@@ -139,7 +143,7 @@ contract Game{
             if (number >= block.number)
                 return(0, 0);
             if (betNumber != number)
-                openNumber = hashNumber(getHashByNumber(number));
+                openNumber = hashNumber(getHashByNumberSafe(number));
             uint256 totalValue;
             if(trxvalue > 0){
                 totalValue = isWin(betType, openNumber, trxvalue);
@@ -203,9 +207,7 @@ contract Game{
         if(hashnum > 0)
             hashbyte = bytes32(hashnum);
         if(uint256(hashbyte) == 0)
-            hashbyte = blockhash(number);
-        if(uint256(hashbyte) == 0)
-        hashbyte = Hashes[number];
+            hashbyte = getHashByNumberUnsafe(hashnum);
         openNumber = hashNumber(hashbyte);
         winvalue = isWin(betType, openNumber, trxvalue>0?trxvalue:rtrxvalue);
         rid = bytes32(id);
@@ -220,12 +222,12 @@ contract Game{
             uint256 limit = 0;
             if(BetRecordExtend.length > 256)
                 limit = BetRecordExtend.length - 256;
-            for(uint256 i = BetRecordExtend.length - 1; i >= limit; i--){
-                uint256 bid = BetRecordExtend[i].betInfoEn;
+            for(uint256 i = BetRecordExtend.length; i > limit; i--){
+                uint256 bid = BetRecordExtend[i-1].betInfoEn;
                 (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType) = decode(bid);
                 trxvalue;rtrxvalue;betType;
                 if (player == msg.sender){
-                    return (bytes32(bid), getHashByNumber(number), msg.sender.balance, msg.sender.tokenBalance(tokenIdRTRX));
+                    return (bytes32(bid), getHashByNumberUnsafe(number), msg.sender.balance, msg.sender.tokenBalance(tokenIdRTRX));
                 }
             }
         }
