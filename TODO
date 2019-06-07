@@ -3,6 +3,6 @@
 - 可以通过游戏名查询游戏地址,状态
 - 可以查看当前所有游戏
 - 不允许同名游戏存在,同名游戏必须先关闭后替换
-- lock update失败?
-- close update 失败?
+x - lock update失败? // 拆分
+x - close update 失败? // 拆分
 x - 不允许Owner创建游戏合约

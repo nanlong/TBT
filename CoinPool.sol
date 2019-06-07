@@ -48,9 +48,7 @@ contract CoinPool{
         tokenIdTBS = TBS_ID;
     }
 
-    function isOpen() external view returns(bool){
-        return opening && games[msg.sender]==GameStatus.OPEN;
-    }
+    /* ------------------------------[Only Owner!]------------------------------- */
 
     function switchTBT(TRC20 _tbt) public onlyOwner{
         tbt = _tbt;
@@ -74,37 +72,47 @@ contract CoinPool{
         update(0, gamelist.length);
     }
 
-    function gameCount() external view returns(uint256){
-        return gamelist.length;
-    }
     // 增加游戏合约地址,增加后该合约即可以使用资金(在资金池解锁的状态下)
     // 权限: owner
     // 参数: _game 游戏合约地址
-    function addGame(Game _game) external onlyOwner{
+    function addGameWithUpdate(Game _game) external onlyOwner{
         if(games[address(_game)] == GameStatus.NONE)
             gamelist.push(_game);
-        games[address(_game)] = GameStatus.OPEN;
+        justOpenGame(_game);
         _game.update();
     }
     // 停止某个游戏合约, 停止后该合约即无法使用资金
     // 权限: owner
     // 参数: _game 停止的游戏合约地址
-    function stopGame(Game _game) external onlyOwner{
-        games[address(_game)] = GameStatus.CLOSE;
+    function stopGameWithUpdate(Game _game) external onlyOwner{
+        justStopGame(_game);
         _game.update();
     }
 
     // 冻结资金池, 所有的游戏均无法使用资金
     // 权限: owner
-    function lock() external onlyOwner{
-        opening = false;
+    function lockWithUpdate() external onlyOwner{
+        justLock();
         updateAll();
     }
     // 解锁资金池
     // 权限: owner
-    function unlock() external onlyOwner{
-        opening = true;
+    function unlockWithUpdate() external onlyOwner{
+        justUnlock();
         updateAll();
+    }
+
+    function justOpenGame(Game _game) public onlyOwner{
+        games[address(_game)] = GameStatus.OPEN;
+    }
+    function justStopGame(Game _game) public onlyOwner{
+        games[address(_game)] = GameStatus.CLOSE;
+    }
+    function justLock() public onlyOwner{
+        opening = false;
+    }
+    function justUnlock() public onlyOwner{
+        opening = true;
     }
 
     // 修改资金比率
@@ -128,6 +136,8 @@ contract CoinPool{
     function withdrawTRC20(address trc, uint256 _amount) external onlyOwner {
         TRC20(trc).transfer(msg.sender, _amount);
     }
+
+    /* ------------------------------[Only Gamer!]------------------------------- */
 
     // 转账, 转账资金到指定地址, 由Game合约调用, 当玩家胜利后, Game合约调用此方法发起转账
     // 权限: gamer
@@ -158,12 +168,24 @@ contract CoinPool{
         to.transferToken(_TBS, tokenIdTBS);
     }
 
+    /* ------------------------------[Only View!]------------------------------- */
+
+    function gameCount() external view returns(uint256){
+        return gamelist.length;
+    }
+
+    function isOpen() external view returns(bool){
+        return opening && games[msg.sender]==GameStatus.OPEN;
+    }
+
     function balanceTRX() external view returns(uint256){
         return address(this).balance;
     }
     function balanceToken(uint256 token) external view returns(uint256){
         return address(this).tokenBalance(token);
     }
+
+    /* ------------------------------[Only Deposit!]------------------------------- */
 
     // 充值, 向合约转账即表示向合约充值. 玩家失败后, 或者想增加资金数, 由此向合约充值.
     // 权限: 无
