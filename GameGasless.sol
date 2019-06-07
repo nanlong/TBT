@@ -35,6 +35,7 @@ contract Game{
         name = _name;
         _CoinPool = CoinPool(pool);
         update();
+        require(msg.sender!=owner); // owner不可以创建游戏合约
         nextOpen = 0;
     }
     function () external payable{}
