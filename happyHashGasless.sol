@@ -16,7 +16,7 @@ contract HappyHash is Game{
 			n++;
 			betType &= betType - 1;
 		}
-        return n>0 ? betValue*97/100/n : 0;
+        return n>0 ? betValue*970/100/n : 0;
     }
 
     function hashNumber(bytes32 betHash) internal pure returns(uint256 number){
