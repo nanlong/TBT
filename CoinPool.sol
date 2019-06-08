@@ -76,6 +76,7 @@ contract CoinPool{
     // 权限: owner
     // 参数: _game 游戏合约地址
     function addGameWithUpdate(Game _game) external onlyOwner{
+        require(address(_game) != address(this));
         if(games[address(_game)] == GameStatus.NONE)
             gamelist.push(_game);
         justOpenGame(_game);
@@ -103,9 +104,11 @@ contract CoinPool{
     }
 
     function justOpenGame(Game _game) public onlyOwner{
+        require(games[address(_game)]!=GameStatus.NONE);
         games[address(_game)] = GameStatus.OPEN;
     }
     function justStopGame(Game _game) public onlyOwner{
+        require(games[address(_game)]!=GameStatus.NONE);
         games[address(_game)] = GameStatus.CLOSE;
     }
     function justLock() public onlyOwner{

@@ -6,3 +6,4 @@
 x - lock update失败? // 拆分
 x - close update 失败? // 拆分
 x - 不允许Owner创建游戏合约
+x - add game不可以是奖池自己
