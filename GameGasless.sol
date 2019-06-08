@@ -208,7 +208,7 @@ contract Game{
         if(hashnum > 0)
             hashbyte = bytes32(hashnum);
         if(uint256(hashbyte) == 0)
-            hashbyte = getHashByNumberUnsafe(hashnum);
+            hashbyte = getHashByNumberUnsafe(number);
         openNumber = hashNumber(hashbyte);
         winvalue = isWin(betType, openNumber, trxvalue>0?trxvalue:rtrxvalue);
         rid = bytes32(id);

@@ -104,9 +104,12 @@ contract CoinPool{
     }
 
     function justOpenGame(Game _game) public onlyOwner{
+        require(address(_game) != address(this));
+        require(games[address(_game)]!=GameStatus.NONE);
         games[address(_game)] = GameStatus.OPEN;
     }
     function justStopGame(Game _game) public onlyOwner{
+        require(games[address(_game)]!=GameStatus.NONE);
         games[address(_game)] = GameStatus.CLOSE;
     }
     function justLock() public onlyOwner{
