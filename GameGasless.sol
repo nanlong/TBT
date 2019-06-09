@@ -20,7 +20,7 @@ contract Game{
     CoinPool public  _CoinPool;
     uint256 public tokenIdRTRX;
     struct BetStruct {
-        uint256 betInfoEn; //
+        bytes32 betInfoEn; //
     }
     event betLog(bytes32 id);
     //event openLog(uint256 id, uint256 totalValue);
@@ -69,7 +69,7 @@ contract Game{
         BetRecordExtend.length++;
         return BetRecordExtend[BetRecordExtend.length-1];
     }
-    function encode(address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType)internal pure returns(uint256){
+    function encode(address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType)internal pure returns(bytes32){
         require(trxvalue < ((1<<31)*1e6) && 
                 rtrxvalue < ((1<<31)*1e6) && 
                 number < (1<<32) &&
@@ -79,9 +79,10 @@ contract Game{
             value = rtrxvalue/1e6;
             value |= 1<<31;
         }
-        return uint256(player)<<(12*8) | value<<(8*8) | number<<(4*8) | betType;
+        return bytes32(uint256(player)<<(12*8) | value<<(8*8) | number<<(4*8) | betType);
     }
-    function decode(uint256 en) internal pure returns(address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType){
+    function decode(bytes32 _en) internal pure returns(address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType){
+        uint256 en = uint256(_en);
         player = address(en >> (12*8));
         trxvalue = rtrxvalue = 0;
         uint256 value = (en >> (8*8));
@@ -114,7 +115,7 @@ contract Game{
         openExtendRecord(1);
         BetStruct storage ibet = getFreeSlot();
         ibet.betInfoEn = encode(msg.sender, msg.value, msg.tokenvalue, block.number, betType); // encode: small gas 3820 sun
-        emit betLog(bytes32(ibet.betInfoEn)); // gas 19170 sun
+        emit betLog(ibet.betInfoEn); // gas 19170 sun
     }
 
     function openall() public{
@@ -171,7 +172,7 @@ contract Game{
         uint256 betNumber = 0;
         for(i = nextOpen; i < end; i++){
             BetStruct storage ibet = BetRecordExtend[i];
-            if (ibet.betInfoEn==0)
+            if (uint256(ibet.betInfoEn)==0)
                 continue;
             (betNumber, openNumber) = openIbet(ibet, betNumber, openNumber);
             if (betNumber == 0)
@@ -185,7 +186,7 @@ contract Game{
         uint256 betNumber = 0;
         for (uint256 i = start; i < end; i++){
             BetStruct storage ibet = BetRecordExtend[i];
-            if (ibet.betInfoEn==0)
+            if (uint256(ibet.betInfoEn)==0)
                 continue;
             (betNumber, openNumber) = openIbet(ibet, betNumber, openNumber);
             if (betNumber == 0)
@@ -200,11 +201,11 @@ contract Game{
 
     function xopenWithHash(uint256 num, uint256 hashnum) public view returns(bytes32 id, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 trxvalue, uint256 rtrxvalue, uint256 winvalue){
         BetStruct storage ibet = BetRecordExtend[num];
-        return preopenWithHash(ibet.betInfoEn, hashnum);
+        return preopenWithHash(uint256(ibet.betInfoEn), hashnum);
     }
 
     function preopenWithHash(uint256 id, uint256 hashnum) public view  returns(bytes32 rid, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 trxvalue, uint256 rtrxvalue, uint256 winvalue){
-        (player, trxvalue, rtrxvalue, number, betType) = decode(id);
+        (player, trxvalue, rtrxvalue, number, betType) = decode(bytes32(id));
         if(hashnum > 0)
             hashbyte = bytes32(hashnum);
         if(uint256(hashbyte) == 0)
@@ -224,11 +225,11 @@ contract Game{
             if(BetRecordExtend.length > 256)
                 limit = BetRecordExtend.length - 256;
             for(uint256 i = BetRecordExtend.length; i > limit; i--){
-                uint256 bid = BetRecordExtend[i-1].betInfoEn;
+                bytes32 bid = BetRecordExtend[i-1].betInfoEn;
                 (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType) = decode(bid);
                 trxvalue;rtrxvalue;betType;
                 if (player == msg.sender){
-                    return (bytes32(bid), getHashByNumberUnsafe(number), msg.sender.balance, msg.sender.tokenBalance(tokenIdRTRX));
+                    return (bid, getHashByNumberUnsafe(number), msg.sender.balance, msg.sender.tokenBalance(tokenIdRTRX));
                 }
             }
         }
