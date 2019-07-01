@@ -14,6 +14,7 @@ contract CoinPool{
     enum GameStatus{NONE,CLOSE,OPEN}
     // owner 合约拥有者, 拥有合约所有的权限. owner为合约创建者, 暂不支持更改.
     // 一定要保存好owner的私钥, 做好备份并禁止泄露.
+    CoinPool public preCoinPool;
     address public  owner;
     // 资金池总开关. true:表示打开, false:表示锁定.
     // 锁定状态下所有Game都无法动用资金. owner提现不受限制.
@@ -27,6 +28,11 @@ contract CoinPool{
     // 如果超过这个限度, 则转账失败, 不会发生任何的资金变动.
     uint256 public leverRadio;
 
+    uint256 public ownerInTRX;
+    uint256 public ownerOutTRX;
+    uint256 public ownerOutRTRX;
+    uint256 public totalProfit;
+    address public profitContract;
     TRC20 public tbt;
     uint256 public tokenIdRTRX;
     uint256 public tokenIdTBS;
@@ -35,12 +41,14 @@ contract CoinPool{
     modifier onlyOwner(){require(msg.sender==owner);_;}
     // mustOpen 表示只有资金池处于打开状态, 并且对应的game允许动用资金, 才可以通过
     modifier onlyGamer(){require(opening==true&&games[msg.sender]==GameStatus.OPEN);_;}
+    modifier onlyProfit(){require(opening=true&&msg.sender == profitContract);_;}
 
     // 创建合约,设置owner为创建者
     // 权限: 无
     // 参数: _openning 资金池状态
     //      _leverRadio 资金比率
-    constructor(bool _openning, uint256 _leverRadio, TRC20 _tbt, uint256 TBS_ID, uint256 RTRX_ID) public{
+    constructor(CoinPool prePool, bool _openning, uint256 _leverRadio, TRC20 _tbt, uint256 TBS_ID, uint256 RTRX_ID) public{
+        preCoinPool = prePool;
         owner = msg.sender;
         opening = _openning;
         leverRadio = _leverRadio;
@@ -48,6 +56,24 @@ contract CoinPool{
         tokenIdRTRX = RTRX_ID;
         tokenIdTBS = TBS_ID;
     }
+/*
+    constructor(CoinPool prePool) public {
+        preCoinPool = prePool;
+        owner = preCoinPool.owner();
+        opening = preCoinPool.opening();
+        leverRadio = preCoinPool.leverRadio();
+        tbt = preCoinPool.tbt();
+        tokenIdRTRX = preCoinPool.tokenIdRTRX();
+        tokenIdTBS = preCoinPool.tokenIdTBS();
+        for(uint256 i = 0; i < preCoinPool.gameCount(); i++){
+            address game = preCoinPool.gamelist(i);
+            if(preCoinPool.games(game) == GameStatus.OPEN){
+                gamelist.push(Game(game));
+                games[game] = GameStatus.OPEN;
+            }
+        }
+    }
+*/
 
     /* ------------------------------[Only Owner!]------------------------------- */
 
@@ -61,6 +87,16 @@ contract CoinPool{
 
     function switchTBS(uint256 token)public onlyOwner{
         tokenIdTBS = token;
+    }
+
+    function switchProfitContract(address profit) public onlyOwner {
+        profitContract = profit;
+    }
+
+    function addOwnerInTRX(uint256 amount) public onlyOwner{
+        if(opening)
+            require(ownerInTRX + amount > ownerInTRX, "addOwnerInTRX check");
+        ownerInTRX += amount;
     }
     
     function update(uint256 start, uint256 end) public onlyOwner {
@@ -130,11 +166,19 @@ contract CoinPool{
     // 权限: owner
     // 参数: _amount 提现金额, 如果提现金额比资金池大, 则提走全部资金 
     function withdraw(uint256  _amount) external onlyOwner{
-        owner.transfer(_amount);
+        if (opening)
+            require(ownerOutTRX + _amount > ownerOutTRX, "withdraw check");
+        msg.sender.transfer(_amount);
+        if (ownerOutTRX + _amount > ownerOutTRX)
+            ownerOutTRX += _amount;
     }
 
     function withdrawToken(uint256 _amount, uint256 tokenID) external onlyOwner {
+        if (opening)
+            require(ownerOutRTRX + _amount > ownerOutRTRX, "withdrawToken check");
         msg.sender.transferToken(_amount, tokenID);
+        if(tokenID == tokenIdRTRX && ownerOutRTRX + _amount > ownerOutRTRX)
+            ownerOutRTRX += _amount;
     }
 
     function withdrawTRC20(address trc, uint256 _amount) external onlyOwner {
@@ -182,14 +226,36 @@ contract CoinPool{
         return opening && games[msg.sender]==GameStatus.OPEN;
     }
 
-    function balanceTRX() external view returns(uint256){
+    function balanceTRX() public view returns(uint256){
         return address(this).balance;
     }
-    function balanceToken(uint256 token) external view returns(uint256){
+    function balanceToken(uint256 token) public view returns(uint256){
         return address(this).tokenBalance(token);
     }
 
+    /* ------------------------------[Only Profit!]------------------------------- */
+
+    function getProfits() public view returns(int256){
+        uint256 curAmount = balanceTRX() + balanceToken(tokenIdRTRX);
+        uint256 totalOut = ownerOutTRX + ownerOutRTRX;
+        uint256 totalIn = ownerInTRX;
+        return int256(curAmount + totalOut) - int(totalIn);
+    }
+
+    function withdrawProfit() external onlyProfit {
+        int256 curProfits = getProfits();
+        require(curProfits > 0, "withdrawProfit check");
+        msg.sender.transfer(uint256(curProfits));
+        totalProfit += uint256(curProfits);
+    }
+
     /* ------------------------------[Only Deposit!]------------------------------- */
+
+    function DepositTRX() external payable {
+        require(msg.tokenvalue == 0 && msg.value > 0);
+        require(ownerInTRX + msg.value > ownerInTRX, "DepositTRX check");
+        ownerInTRX += msg.value;
+    }
 
     // 充值, 向合约转账即表示向合约充值. 玩家失败后, 或者想增加资金数, 由此向合约充值.
     // 权限: 无

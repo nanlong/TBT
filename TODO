@@ -1,5 +1,5 @@
 - 在线切换CoinPool
-    1. 切换CoinPool后,新CoinPool需要将游戏数据拷贝过来
+    x1. 切换CoinPool后,新CoinPool需要将游戏数据拷贝过来
 - 可以通过游戏名查询游戏地址,状态
 - 可以查看当前所有游戏
 - 不允许同名游戏存在,同名游戏必须先关闭后替换
@@ -7,3 +7,16 @@ x - lock update失败? // 拆分
 x - close update 失败? // 拆分
 x - 不允许Owner创建游戏合约
 x - add game不可以是奖池自己
+
+## 分红
+- selfMath
+- 累加溢出处理
+- x充值统计（x溢出）
+- x提现统计（x溢出）
+- x统计盈利: profit = cur + totalOut - totalIn; （-溢出)
+- x误转账修正 (x溢出)
+- x分红合约切换
+- 分红时间限制?
+- x奖池切换
+- x分红细节由分红合约实现
+

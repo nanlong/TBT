@@ -1,9 +1,18 @@
 pragma solidity >=0.4.0;
 
+
+contract TRC20 {
+    function transfer(address to, uint tokens) public returns (bool success);
+    function transferFrom(address from, address to, uint tokens) public returns (bool success);
+}
+
 contract CoinPool{
     uint256 public tokenIdRTRX;
     address public  owner;
+    TRC20 public tbt;
     function isOpen() external view returns(bool);
+    function getProfits() public view returns(int256);
+    function withdrawProfit() external;
     function transfer(address to, uint256 _amount) external;
     function transferTBTAndTBS(address to,uint256 _TBT, uint256 _TBS) external;
     function ()external payable;
