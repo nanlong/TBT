@@ -2,7 +2,15 @@ pragma solidity >=0.4.0;
 
 import "game.sol";
 
-contract LockProfit is Game{
+contract LockProfit{
+
+    address public owner;
+    CoinPool public  _CoinPool;
+
+    modifier onlyOwner(){require(msg.sender==owner, "onlyOwner");_;}
+    modifier gameOpened(){require(opening, "onlyOpened");_;}
+    modifier onlyCoinPool(){require(msg.sender==address(_CoinPool), "onlyCoinPool");_;}
+
     TRC20 public tbt;
     struct Order{
         uint256 amount;
@@ -22,6 +30,7 @@ contract LockProfit is Game{
         int256 totalProfit;
         uint256 totalTBT;
         uint256 blockInfo;
+        uint256 sharePercentage;
         mapping(address=>uint256) holders;
     }
 
@@ -30,18 +39,21 @@ contract LockProfit is Game{
     mapping(address=>UnlockOrderList) unlockTBTHistory;
     mapping(address=>WithdrawOrderList) public withdrawTBTHistory;
 
-    mapping(address=>uint256) public playerTBTAmount;
+    mapping(address=>uint256) public holderTBTAmount;
     uint256 public totalTBT;
     address[] public holdersList;
     bool public isShareExecing;
     uint256 public nextShare;
     uint256 public shareTimestamp;
     uint256 public sharePercentage;
+    bool public opening;
 
-    constructor(string _name, address pool, uint256 _percentage) Game(_name,pool) public{
-        tbt = _CoinPool.tbt();
+    constructor(CoinPool pool, uint256 _percentage) public{
+        _CoinPool = pool;
+        update();
+        require(msg.sender != owner, "contract owner check");
         isShareExecing = false;
-        changeSharePercentage(_percentage);
+        changeSharePercentageUnsafe(_percentage);
     }
 
     function timeAlign() public view returns(uint256) {
@@ -55,15 +67,15 @@ contract LockProfit is Game{
 /* ------- holder info ------ */
     // return (holder, holderLength, totalTBT, curProfits,  holder.lockTBT, isSharing), 
     function getHolderInfo(address holder) public view returns (address, uint256, uint256, int256, uint256, bool){
-        return (holder, holdersList.length, totalTBT, _CoinPool.getProfits(), playerTBTAmount[holder], isShareExecing);
+        return (holder, holdersList.length, totalTBT, _CoinPool.getProfits(), holderTBTAmount[holder], isShareExecing);
     }
 
     function getMyInfo() public view returns (address, uint256, uint256, int256, uint256, bool){
         return getHolderInfo(msg.sender);
     }
 
-    function getInfoByIndex(uint256 index) public view returns (address, uint256, uint256, int256, uint256, bool){
-        address holder = holdersList[index];
+    function getInfoByIndex(uint256 holderIndex) public view returns (address, uint256, uint256, int256, uint256, bool){
+        address holder = holdersList[holderIndex];
         return getHolderInfo(holder);
     }
 
@@ -76,31 +88,68 @@ contract LockProfit is Game{
         return getOrderInfoByAddress(msg.sender);
     }
 
-    function getOrderInfoByIndex(uint256 index) public view returns(address, uint256, uint256, uint256){
-        address holder = holdersList[index];
+    function getOrderInfoByIndex(uint256 holderIndex) public view returns(address, uint256, uint256, uint256){
+        address holder = holdersList[holderIndex];
         return getOrderInfoByAddress(holder);
+    }
+
+/* ------- order detail ---------*/
+    function getHistoryOrder(address holder, uint256 orderIndex, bool isLockOrder) public view returns(uint256, uint256){
+        Order[] storage orders = unlockTBTHistory[holder].orders;
+        if(isLockOrder)
+            orders = lockTBTHistory[holder].orders;
+        return (orders[orderIndex].amount, orders[orderIndex].time);
+    }
+
+    function getMyHistoryOrder(uint256 orderIndex, bool isLockOrder) public view returns(uint256, uint256){
+        return getHistoryOrder(msg.sender, orderIndex, isLockOrder);
+    }
+
+    function getHistoryOrderByIndex(uint256 holderIndex, uint256 orderIndex, bool isLockOrder) public view returns(uint256, uint256){
+        address holder = holdersList[holderIndex];
+        return getHistoryOrder(holder, orderIndex, isLockOrder);
     }
 
 /* ------- profit info ------ */
 
-    function queryHistoryProfitByTime(address holder, uint256 time) public view returns(int256, uint256, uint256, uint256){
+    function queryHistoryProfitByTime(address holder, uint256 time) public view returns(int256, uint256, uint256, uint256, uint256){
         DayProfit storage dayProfit = profitHistory[timeKey(time)];
-        return (dayProfit.totalProfit, dayProfit.totalTBT, dayProfit.blockInfo, dayProfit.holders[holder]);
+        return (dayProfit.totalProfit, dayProfit.totalTBT, dayProfit.blockInfo, dayProfit.sharePercentage,dayProfit.holders[holder]);
     }
 
-    function queryMyHistoryProfitByTime(uint256 time) public view returns(int256, uint256, uint256, uint256){
+    function queryMyHistoryProfitByTime(uint256 time) public view returns(int256, uint256, uint256, uint256, uint256){
         return queryHistoryProfitByTime(msg.sender, time);
     }
 
-    function queryHistoryLockInfoByIndex(uint256 index, uint256 time) public view returns(int256, uint256, uint256, uint256){
+    function queryHistoryLockInfoByIndex(uint256 index, uint256 time) public view returns(int256, uint256, uint256, uint256, uint256){
         address holder = holdersList[index];
         return queryHistoryProfitByTime(holder, time);
     }
 /* ------ only owner -----*/
-    function changeSharePercentage(uint256 _percentage) public onlyOwner{
+    function changeSharePercentageUnsafe(uint256 _percentage) internal {
         require(_percentage <= 100, "_percentage check");
         sharePercentage = _percentage;
     }
+    function changeSharePercentage(uint256 _percentage) external onlyOwner{
+        changeSharePercentageUnsafe(_percentage);
+    }
+
+    function updateCoinPool() external onlyCoinPool{
+        _CoinPool = _CoinPool.nextCoinPool();
+        update();
+    }
+
+    function update() public {
+        owner = _CoinPool.owner();
+        tbt = _CoinPool.tbt();
+        opening = _CoinPool.isOpen();
+    }
+
+    function switchCoinPool(address pool) external onlyOwner{
+        _CoinPool = CoinPool(pool);
+        update();
+    }
+
 /* ------ rw logic ------ */
 
     function appendOrder(Order[] storage orders, uint256 tbtAmount) internal {
@@ -110,27 +159,31 @@ contract LockProfit is Game{
         order.amount = tbtAmount;
     }
 
-    function lockTBT(uint256 tbtAmount) public{
-        require(isShareExecing == false, "lockTBT share check");
+    function lockTBTToOther(address holder, uint256 tbtAmount) public gameOpened{
+        require(isShareExecing == false, "lockTBTToOther share check");
         tbt.transferFrom(msg.sender, address(this), tbtAmount);
-        Order[] storage orders = lockTBTHistory[msg.sender].orders;
+        Order[] storage orders = lockTBTHistory[holder].orders;
         if (orders.length == 0)
-            holdersList.push(msg.sender);
+            holdersList.push(holder);
         appendOrder(orders, tbtAmount);
         totalTBT += tbtAmount;
-        playerTBTAmount[msg.sender] += tbtAmount;
+        holderTBTAmount[holder] += tbtAmount;
     }
 
-    function unlockTBT(uint256 tbtAmount) public {
+    function lockTBT(uint256 tbtAmount) public{
+        lockTBTToOther(msg.sender, tbtAmount);
+    }
+
+    function unlockTBT(uint256 tbtAmount) public gameOpened {
         require(isShareExecing == false, "unlockTBT share check");
-        require(playerTBTAmount[msg.sender] >= tbtAmount, "unlockTBT check");
+        require(holderTBTAmount[msg.sender] >= tbtAmount, "unlockTBT check");
         Order[] storage orders = unlockTBTHistory[msg.sender].orders;
         appendOrder(orders, tbtAmount);
         totalTBT -= tbtAmount;
-        playerTBTAmount[msg.sender] -= tbtAmount;
+        holderTBTAmount[msg.sender] -= tbtAmount;
     }
 
-    function withdrawLimitedTBT(uint256 n) public {
+    function withdrawLimitedTBT(uint256 n) public gameOpened {
         if(n > 100) n = 100;
         Order[] storage unlockOrders = unlockTBTHistory[msg.sender].orders;
         WithdrawOrderList storage withdraw = withdrawTBTHistory[msg.sender];
@@ -152,7 +205,7 @@ contract LockProfit is Game{
         withdrawLimitedTBT(unlockTBTHistory[msg.sender].orders.length);
     }
 
-    function DoShareProfitStart() public {
+    function DoShareProfitStart() public gameOpened {
         require(shareTimestamp + 23 hours < timeAlign(), "DoProfitStart replay check");
         require(isShareExecing == false, "DoProfitStart share check");
         require(block.timestamp >= timeAlign(), "DoProfitStart time check");
@@ -164,13 +217,14 @@ contract LockProfit is Game{
         dayProfit.totalProfit = _CoinPool.getProfits();
         if(dayProfit.totalProfit > 0){
             _CoinPool.withdrawProfit();
-            require(uint256(dayProfit.totalProfit) == address(this).balance, "DoProfitStart balance check");
+            require(uint256(dayProfit.totalProfit) <= address(this).balance, "DoProfitStart balance check");
         }
         dayProfit.totalTBT = totalTBT;
         dayProfit.blockInfo == block.number;
+        dayProfit.sharePercentage = sharePercentage;
     }
 
-    function DoShareProfit() public {
+    function DoShareProfit() public gameOpened {
         require(isShareExecing == true, "DoSnapsoot isShareExecing");
         DayProfit storage dayProfit = profitHistory[shareTimestamp];
         if(dayProfit.totalProfit <= 0){
@@ -183,8 +237,8 @@ contract LockProfit is Game{
         uint256 i;
         for( i = nextShare; i < end; i++) {
             address holder = holdersList[i];
-            dayProfit.holders[holder] = playerTBTAmount[holder];
-            holder.transfer(uint256(dayProfit.totalProfit) * dayProfit.holders[holder] * 100 / dayProfit.totalTBT / sharePercentage);
+            dayProfit.holders[holder] = holderTBTAmount[holder];
+            holder.transfer(uint256(dayProfit.totalProfit) * dayProfit.holders[holder] * 100 / dayProfit.totalTBT / dayProfit.sharePercentage);
         }
         nextShare = i;
         if (nextShare >= holdersList.length) {

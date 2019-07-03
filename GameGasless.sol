@@ -1,6 +1,5 @@
 pragma solidity >=0.4.0;
 
-
 contract TRC20 {
     function transfer(address to, uint tokens) public returns (bool success);
     function transferFrom(address from, address to, uint tokens) public returns (bool success);
@@ -10,6 +9,8 @@ contract CoinPool{
     uint256 public tokenIdRTRX;
     address public  owner;
     TRC20 public tbt;
+    CoinPool public nextCoinPool;
+    address public profitContract;
     function isOpen() external view returns(bool);
     function getProfits() public view returns(int256);
     function withdrawProfit() external;
@@ -38,13 +39,14 @@ contract Game{
     BetStruct[] public BetRecordExtend;
     mapping(uint256=>bytes32) public Hashes;
 
-    modifier onlyOwner(){require(msg.sender==owner);_;}
-    modifier gameOpened(){require(opening);_;}
+    modifier onlyCoinPool(){require(msg.sender==address(_CoinPool), "onlyCoinPool");_;}
+    modifier onlyOwner(){require(msg.sender==owner, "onlyOwner");_;}
+    modifier gameOpened(){require(opening, "onlyOpen");_;}
     constructor(string _name, address pool)public{
         name = _name;
         _CoinPool = CoinPool(pool);
         update();
-        require(msg.sender!=owner); // owner不可以创建游戏合约
+        require(msg.sender!=owner, "contract owner check"); // owner不可以创建游戏合约
         nextOpen = 0;
     }
     function () external payable{}
@@ -55,6 +57,11 @@ contract Game{
     }
     function switchCoinPool(address pool) external onlyOwner{
         _CoinPool = CoinPool(pool);
+        update();
+    }
+
+    function updateCoinPool() external onlyCoinPool{
+        _CoinPool = _CoinPool.nextCoinPool();
         update();
     }
 
@@ -71,7 +78,7 @@ contract Game{
 
     function getHashByNumberSafe(uint256 number)internal view returns (bytes32 _hash){
         _hash = getHashByNumberUnsafe(number);
-        require(uint256(_hash) > 0);
+        require(uint256(_hash) > 0, "hash check");
     }
 
     function getFreeSlot() internal returns(BetStruct storage ibet){
@@ -82,7 +89,7 @@ contract Game{
         require(trxvalue < ((1<<31)*1e6) && 
                 rtrxvalue < ((1<<31)*1e6) && 
                 number < (1<<32) &&
-                uint256(player) < (1<<160));
+                uint256(player) < (1<<160), "encode check");
         uint256 value = trxvalue/1e6;
         if (rtrxvalue > 0) {
             value = rtrxvalue/1e6;
@@ -115,10 +122,10 @@ contract Game{
             return;
         }
         if (msg.tokenid == tokenIdRTRX){
-            require(msg.tokenvalue >= 20e6 && msg.tokenvalue < address(_CoinPool).balance/10);
+            require(msg.tokenvalue >= 20e6 && msg.tokenvalue < address(_CoinPool).balance/10, "bet rtrx check");
             _CoinPool.transferTBTAndTBS(msg.sender, msg.tokenvalue*1e9, msg.tokenvalue); // big gas 352110 sun
         }else{
-            require(msg.value >= 20e6 && msg.value < address(_CoinPool).balance/10);
+            require(msg.value >= 20e6 && msg.value < address(_CoinPool).balance/10, "bet trx check");
             _CoinPool.transferTBTAndTBS(msg.sender, msg.value*1e9, msg.value); // big gas
         }
         openExtendRecord(1);
