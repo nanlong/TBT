@@ -3,6 +3,9 @@ pragma solidity >=0.4.0;
 contract TRC20 {
     function transfer(address to, uint tokens) public returns (bool success);
     function transferFrom(address from, address to, uint tokens) public returns (bool success);
+    function approve(address _spender, uint256 _value) public;
+    uint256 public totalSupply;
+    mapping (address => uint256) public balanceOf;
 }
 
 contract CoinPool{
