@@ -55,9 +55,10 @@ contract CoinPool{
     // 权限: 无
     // 参数: _openning 资金池状态
     //      _leverRadio 资金比率
-    /*
-    constructor(CoinPool prePool, bool _openning, uint256 _leverRadio, TRC20 _tbt, uint256 TBS_ID, uint256 RTRX_ID) public{
+
+    constructor(CoinPool prePool, Game profit, bool _openning, uint256 _leverRadio, TRC20 _tbt, uint256 TBS_ID, uint256 RTRX_ID) public{
         preCoinPool = prePool;
+        profitContract = profit;
         owner = msg.sender;
         opening = _openning;
         leverRadio = _leverRadio;
@@ -65,14 +66,15 @@ contract CoinPool{
         tokenIdRTRX = RTRX_ID;
         tokenIdTBS = TBS_ID;
     }
-    */
+
+/*
     constructor(CoinPool prePool) public {
         preCoinPool = prePool;
         owner = preCoinPool.owner();
         nextCoinPool = CoinPool(owner);
         opening = false;
     }
-
+*/
     /* ------------------------------[Only Coinpool!]------------------------------- */
 
     function copyData() internal {
@@ -144,12 +146,16 @@ contract CoinPool{
         tokenIdTBS = token;
     }
 
-    function switchProfitContract(Game profit) public onlyOwner {
-        games[address(profitContract)] = GameStatus.CLOSE;
-        profitContract.update();
+    function justAddProfitContract(Game profit) public onlyOwner {
         profitContract = profit;
         games[address(profitContract)] = GameStatus.OPEN;
         profitContract.update();
+    }
+
+    function switchProfitContract(Game profit) public {
+        games[address(profitContract)] = GameStatus.CLOSE;
+        profitContract.update();
+        justAddProfitContract(profit);
     }
 
     function addProfitTRX(uint256 amount) public onlyOwner {

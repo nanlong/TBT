@@ -8,12 +8,15 @@ contract LockProfit{
     address public owner;
     CoinPool public  _CoinPool;
     uint256 public activedTime;
-    LockProfit public preProfit;
 
-    modifier onlyOwner(){require(msg.sender==owner, "onlyOwner");_;}
+    LockProfit public preProfit;
+    LockProfit public nextProfit;
+
+    modifier onlyOwner(){require(msg.sender == owner, "onlyOwner");_;}
     modifier gameOpened(){require(opening, "onlyOpened");_;}
-    modifier onlyCoinPool(){require(msg.sender==address(_CoinPool), "onlyCoinPool");_;}
+    modifier onlyCoinPool(){require(msg.sender == address(_CoinPool), "onlyCoinPool");_;}
     modifier onlyActived(){require(activedTime > 0, "onlyActived");_;}
+    modifier onlyNextProfit(){require(msg.sender == address(nextProfit), "onlyNextProfit");_;}
 
     TRC20 public tbt;
     struct Order{
@@ -67,14 +70,24 @@ contract LockProfit{
         require(msg.sender != owner, "contract owner check");
         isShareExecing = false;
         changeSharePercentageUnsafe(_percentage);
+        activedTime = block.timestamp;
     }
-
+/*
+    constructor(LockProfit profit) public {
+        preProfit = profit;
+        require(msg.sender != preProfit.owner(), "contract owner check");
+    }
+*/
     function timeAlign() public view returns(uint256) {
         return timeKey(block.timestamp);
     }
 
     function timeKey(uint256 time) public pure returns(uint256){
         return time / 1 days * 1 days + 4 hours;
+    }
+
+    function balanceTRX() public view returns(uint256){
+        return address(this).balance;
     }
 
 /* ------- holder info ------ */
@@ -97,7 +110,7 @@ contract LockProfit{
         uint256 amount = 0;
         for(i = withdraw.nextDeal; i < unlockOrders.length; i++){
             Order storage order = unlockOrders[i];
-            if(order.time + 1 days >= block.timestamp)
+            if(order.time + period >= block.timestamp)
                 break;
             amount += order.amount;
         }
@@ -153,12 +166,16 @@ contract LockProfit{
 
 /* ------- order detail ---------*/
     function getHistoryOrder(address holder, uint256 orderIndex, uint256 isLockOrder) public view returns(uint256, uint256){
-        if(orderIndex < unlockTBTHistory[holder].preLength)
-            return preProfit.getHistoryOrder(holder, orderIndex, isLockOrder);
+        if((isLockOrder == 1 && orderIndex < lockTBTHistory[holder].preLength) ||
+        (isLockOrder == 0 && orderIndex < unlockTBTHistory[holder].preLength))
+                return preProfit.getHistoryOrder(holder, orderIndex, isLockOrder);
         Order[] storage orders = unlockTBTHistory[holder].orders;
-        if(isLockOrder == 1)
+        uint256 offset = orderIndex - unlockTBTHistory[holder].preLength;
+        if(isLockOrder == 1){
             orders = lockTBTHistory[holder].orders;
-        return (orders[orderIndex].amount, orders[orderIndex].time);
+            offset = orderIndex - lockTBTHistory[holder].preLength;
+        }
+        return (orders[offset].amount, orders[offset].time);
     }
 
     function getMyHistoryOrder(uint256 orderIndex, uint256 isLockOrder) public view returns(uint256, uint256){
@@ -220,42 +237,65 @@ contract LockProfit{
         _CoinPool = CoinPool(pool);
         update();
     }
+    function switchProfit(LockProfit profit) external onlyOwner{
+        nextProfit = profit;
+    }
 /* ------ update -------*/
 
-function transferToNewProfit(LockProfit newAddr)  external onlyCoinPool onlyActived {
-    tbt.approve(address(newAddr), tbt.totalSupply());
-    update();
-}
-
-function copyAndActive(uint256 n) public {
-    require(activedTime == 0, "already actived");
-    require(n <= 100, "copy to much");
-    require(preProfit.opening()==false, "preProfit must close");
-    require(totalTBT == preProfit.totalTBT(), "preProfit must not changed");
-    uint256 total = preProfit.getHolderAmount();
-    uint256 end = copyIndex + n;
-    if (end > total)
-        end = total;
-    for(uint256 i = copyIndex; i < end; i++){
-        address holder = preProfit.holdersList(i);
-        holdersList.push(holder);
-        lockTBTHistory[holder].preLength = preProfit.getLockOrderLengthByAddress(holder);
-        unlockTBTHistory[holder].preLength = preProfit.getUnlockOrderLengthByAddress(holder);
-        withdrawTBTHistory[holder].preLength = preProfit.getWidthdrawLengthByAddress(holder);
+    function transferToNewProfit()  external onlyNextProfit onlyActived {
+        require(opening == false, "open check");
+        tbt.approve(nextProfit, tbt.totalSupply());
     }
-    if(end == total){
-        tbt.transferFrom(address(preProfit), address(this), tbt.balanceOf(address(preProfit)));
-        activedTime = block.timestamp;
-        update();
-    }
-}
 
-function copyData(LockProfit preAddr) external onlyCoinPool {
-    require(activedTime == 0, "already actived");
-    preProfit = preAddr;
-    totalTBT = preProfit.totalTBT();
-    sharePercentage = preProfit.sharePercentage();
-}
+    function copydatapre() internal {
+        require(activedTime == 0, "already actived");
+        totalTBT = preProfit.totalTBT();
+        sharePercentage = preProfit.sharePercentage();
+        shareTimestamp = preProfit.shareTimestamp();
+        owner = preProfit.owner();
+        period = preProfit.period();
+        tbt = preProfit.tbt();
+        _CoinPool = preProfit._CoinPool();
+    }
+
+    function ActiveBegin() public {
+        require(copyIndex == 0,"require first active");
+        preProfit.transferToNewProfit();
+        copydatapre();
+        copyAndActive(100);
+    }
+
+    function ActiveContinue() public {
+        copyAndActive(100);
+    }
+
+    function copyAndActive(uint256 n) public onlyOwner {
+        require(activedTime == 0, "already actived");
+        require(n <= 100, "copy to much");
+        require(preProfit.opening()==false, "preProfit must close");
+        require(totalTBT == preProfit.totalTBT(), "preProfit must not changed");
+        uint256 total = preProfit.getHolderAmount();
+        uint256 end = copyIndex + n;
+        if (end > total)
+            end = total;
+        uint256 i;
+        for(i = copyIndex; i < end; i++){
+            address holder = preProfit.holdersList(i);
+            if(getLockOrderLengthByAddress(holder) > 0)
+                continue;
+            holdersList.push(holder);
+            lockTBTHistory[holder].preLength = preProfit.getLockOrderLengthByAddress(holder);
+            unlockTBTHistory[holder].preLength = preProfit.getUnlockOrderLengthByAddress(holder);
+            withdrawTBTHistory[holder].preLength = preProfit.getWidthdrawLengthByAddress(holder);
+            holderTBTAmount[holder] = preProfit.holderTBTAmount(holder);
+        }
+        copyIndex = i;
+        if(end == total){
+            tbt.transferFrom(address(preProfit), address(this), tbt.balanceOf(address(preProfit)));
+            activedTime = block.timestamp;
+            update();
+        }
+    }
 
 
 /* ------ rw logic ------ */
@@ -271,7 +311,7 @@ function copyData(LockProfit preAddr) external onlyCoinPool {
         require(isShareExecing == false, "lockTBTToOther share check");
         tbt.transferFrom(msg.sender, address(this), tbtAmount);
         Order[] storage orders = lockTBTHistory[holder].orders;
-        if (orders.length == 0)
+        if (getLockOrderLengthByAddress(holder) == 0)
             holdersList.push(holder);
         appendOrder(orders, tbtAmount);
         totalTBT += tbtAmount;
@@ -307,6 +347,10 @@ function copyData(LockProfit preAddr) external onlyCoinPool {
         }
     }
 
+    function withdrawAllTBT() external {
+        withdrawLimitedTBT(100);
+    }
+
     function withdrawAllTRX() public onlyOwner{
         msg.sender.transfer(address(this).balance);
     }
@@ -335,16 +379,19 @@ function copyData(LockProfit preAddr) external onlyCoinPool {
         DayProfit storage dayProfit = profitHistory[shareTimestamp];
         if(dayProfit.totalProfit <= 0){
             isShareExecing = false;
+            return;
         }
-
+        require(dayProfit.totalProfit > 0, "profit check");
         uint256 end = nextShare + 100;
         if (end > holdersList.length)
             end = holdersList.length;
         uint256 i;
         for( i = nextShare; i < end; i++) {
             address holder = holdersList[i];
-            dayProfit.holders[holder] = holderTBTAmount[holder];
-            holder.transfer(uint256(dayProfit.totalProfit) * dayProfit.holders[holder] * 100 / dayProfit.totalTBT / dayProfit.sharePercentage);
+            if (holderTBTAmount[holder] >= 1e18) {
+                dayProfit.holders[holder] = holderTBTAmount[holder];
+                holder.transfer(uint256(dayProfit.totalProfit) * dayProfit.holders[holder] * dayProfit.sharePercentage / dayProfit.totalTBT / 100);
+            }
         }
         nextShare = i;
         if (nextShare >= holdersList.length) {
