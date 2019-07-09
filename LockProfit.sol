@@ -63,6 +63,7 @@ contract LockProfit{
     function () external payable{
         require(msg.data.length == 0, "transfer only");
     }
+/*
     constructor(CoinPool pool, uint256 _percentage) public{
         _CoinPool = pool;
         period = 1 days;
@@ -72,12 +73,12 @@ contract LockProfit{
         changeSharePercentageUnsafe(_percentage);
         activedTime = block.timestamp;
     }
-/*
+*/
     constructor(LockProfit profit) public {
         preProfit = profit;
         require(msg.sender != preProfit.owner(), "contract owner check");
     }
-*/
+
     function timeAlign() public view returns(uint256) {
         return timeKey(block.timestamp);
     }
@@ -262,16 +263,16 @@ contract LockProfit{
         require(copyIndex == 0,"require first active");
         preProfit.transferToNewProfit();
         copydatapre();
-        copyAndActive(100);
+        copyAndActive(10);
     }
 
     function ActiveContinue() public {
-        copyAndActive(100);
+        copyAndActive(20);
     }
 
     function copyAndActive(uint256 n) public onlyOwner {
         require(activedTime == 0, "already actived");
-        require(n <= 100, "copy to much");
+        require(n <= 25, "copy to much");
         require(preProfit.opening()==false, "preProfit must close");
         require(totalTBT == preProfit.totalTBT(), "preProfit must not changed");
         uint256 total = preProfit.getHolderAmount();
@@ -374,23 +375,31 @@ contract LockProfit{
         dayProfit.sharePercentage = sharePercentage;
     }
 
-    function DoShareProfit() public gameOpened {
+    function DoShareProfit() public {
+        DoShareProfitLimit(40);
+    }
+
+    function DoShareProfitLimit(uint256 n) public gameOpened {
         require(isShareExecing == true, "DoSnapsoot isShareExecing");
+        require(n <= 50, "share to much");
         DayProfit storage dayProfit = profitHistory[shareTimestamp];
-        if(dayProfit.totalProfit <= 0){
+        uint256 curTotalTBT = dayProfit.totalTBT/1e18;
+        if(dayProfit.totalProfit <= 0 || totalTBT <= 0){
             isShareExecing = false;
             return;
         }
-        require(dayProfit.totalProfit > 0, "profit check");
-        uint256 end = nextShare + 100;
+
+        require(dayProfit.totalProfit > 0 && totalTBT > 0, "profit check");
+        uint256 end = nextShare + n;
         if (end > holdersList.length)
             end = holdersList.length;
         uint256 i;
         for( i = nextShare; i < end; i++) {
             address holder = holdersList[i];
-            if (holderTBTAmount[holder] >= 1e18) {
+            uint256 curHolderAmount = holderTBTAmount[holder]/1e18;
+            if (curHolderAmount > 0) {
                 dayProfit.holders[holder] = holderTBTAmount[holder];
-                holder.transfer(uint256(dayProfit.totalProfit) * dayProfit.holders[holder] * dayProfit.sharePercentage / dayProfit.totalTBT / 100);
+                holder.transfer(uint256(dayProfit.totalProfit) * curHolderAmount * dayProfit.sharePercentage / curTotalTBT / 100);
             }
         }
         nextShare = i;
