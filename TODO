@@ -48,3 +48,7 @@ x - add game不可以是奖池自己
 - withdrawDeal
 - unlockTime
 
+- 过滤合约锁仓
+- 分红period的问题
+- 分红受益人的问题
+- 返回数组的问题

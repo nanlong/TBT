@@ -298,7 +298,6 @@ contract LockProfit{
         }
     }
 
-
 /* ------ rw logic ------ */
 
     function appendOrder(Order[] storage orders, uint256 tbtAmount) internal {
