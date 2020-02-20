@@ -32,6 +32,7 @@ contract Game{
     address public owner;
     CoinPool public  _CoinPool;
     uint256 public tokenIdRTRX;
+    uint256 public MineFraction;
     struct BetStruct {
         bytes32 betInfoEn; //
     }
@@ -45,12 +46,13 @@ contract Game{
     modifier onlyCoinPool(){require(msg.sender==address(_CoinPool), "onlyCoinPool");_;}
     modifier onlyOwner(){require(msg.sender==owner, "onlyOwner");_;}
     modifier gameOpened(){require(opening, "onlyOpen");_;}
-    constructor(string _name, address pool)public{
+    constructor(string memory _name, address payable pool)public{
         name = _name;
         _CoinPool = CoinPool(pool);
         update();
         require(msg.sender!=owner, "contract owner check"); // owner不可以创建游戏合约
         nextOpen = 0;
+        MineFraction = (1<<128)|1000;
     }
     function () external payable{}
     function update() public {
@@ -58,7 +60,7 @@ contract Game{
         tokenIdRTRX = _CoinPool.tokenIdRTRX();
         opening = _CoinPool.isOpen();
     }
-    function switchCoinPool(address pool) external onlyOwner{
+    function switchCoinPool(address payable pool) external onlyOwner{
         _CoinPool = CoinPool(pool);
         update();
     }
@@ -72,10 +74,28 @@ contract Game{
         Hashes[number] = bytes32(_hash);
     }
 
+    function AdjustMineTBT(uint256 fenzi, uint256 fenmu) external onlyOwner returns(uint256) {
+        require(fenzi < (1<<128)-1, "fenzi to big");
+        require(fenmu < (1<<128)-1, "fenmu to big");
+        require(fenzi < fenmu, "fenzi > fenmu");
+        MineFraction = (fenzi << 128) | fenmu;
+        return CalculateTBT(1000);
+    }
+    function TBTFraction() external view returns(uint256,uint256) {
+        return (MineFraction>>128, uint256(uint128(MineFraction)));
+    }
+
+    function CalculateTBT(uint256 amount) public view returns(uint256){
+        uint256 fenzi = MineFraction>>128;
+        uint256 fenmu = uint256(uint128(MineFraction));
+        require(fenmu > 0, "fenmu == 0");
+        return amount * 1e12 * fenzi / fenmu;
+    }
+
     function getHashByNumberUnsafe(uint256 number) internal view returns (bytes32 _hash){
         _hash = blockhash(number);
         if(uint256(_hash) > 0)
-            return;
+            return _hash;
         _hash = Hashes[number];
     }
 
@@ -113,23 +133,21 @@ contract Game{
         betType = uint32(en);
     }
 
-    function isContract(address addr) internal view returns (bool) {
-        uint size;
-        assembly { size := extcodesize(addr) }
-        return size > 0;
+    function isContract() internal view returns (bool) {
+        return tx.origin != msg.sender;
     }
 
     function tibet(uint32 betType) internal gameOpened{
-        if(isContract(msg.sender)){
+        if(isContract()){
             openall();
             return;
         }
         if (msg.tokenid == tokenIdRTRX){
             require(msg.tokenvalue >= 20e6 && msg.tokenvalue < address(_CoinPool).balance/10, "bet rtrx check");
-            _CoinPool.transferTBTAndTBS(msg.sender, msg.tokenvalue*1e9, msg.tokenvalue); // big gas 352110 sun
+            _CoinPool.transferTBTAndTBS(msg.sender, CalculateTBT(msg.tokenvalue), msg.tokenvalue); // big gas 352110 sun
         }else{
             require(msg.value >= 20e6 && msg.value < address(_CoinPool).balance/10, "bet trx check");
-            _CoinPool.transferTBTAndTBS(msg.sender, msg.value*1e9, msg.value); // big gas
+            _CoinPool.transferTBTAndTBS(msg.sender, CalculateTBT(msg.tokenvalue), msg.value); // big gas
         }
         openExtendRecord(1);
         BetStruct storage ibet = getFreeSlot();
@@ -147,7 +165,7 @@ contract Game{
             _CoinPool.transfer(player, totalValue);
     }
 
-    function dealRTRX(address player, uint256 betValue, uint256 totalValue) internal {
+    function dealRTRX(address payable player, uint256 betValue, uint256 totalValue) internal {
         if (totalValue > betValue){
             player.transferToken(betValue, tokenIdRTRX);
             _CoinPool.transfer(player, totalValue - betValue);
@@ -172,7 +190,7 @@ contract Game{
             }
             else{
                 totalValue = isWin(betType, openNumber, rtrxvalue);
-                dealRTRX(player, rtrxvalue, totalValue);
+                dealRTRX(address(uint160(player)), rtrxvalue, totalValue);
             }
             //emit openLog(ibet.betInfoEn, totalValue);
             return (number, openNumber);
