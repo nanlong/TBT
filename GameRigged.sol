@@ -149,7 +149,7 @@ contract Game{
             _CoinPool.transferTBTAndTBS(msg.sender, CalculateTBT(msg.tokenvalue), msg.tokenvalue); // big gas 352110 sun
         }else{
             require(msg.value >= 20e6 && msg.value < address(_CoinPool).balance/10, "bet trx check");
-            _CoinPool.transferTBTAndTBS(msg.sender, CalculateTBT(msg.tokenvalue), msg.value); // big gas
+            _CoinPool.transferTBTAndTBS(msg.sender, CalculateTBT(msg.value), msg.value); // big gas
         }
         openExtendRecord(1);
         bytes32 eid = encode(msg.sender, msg.value, msg.tokenvalue, block.number, betType); // encode: small gas 3820 sun   
