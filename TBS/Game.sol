@@ -10,6 +10,7 @@ contract TRC20 {
 
 contract CoinPool{
     uint256 public tokenIdTBS;
+    uint256 public tokenIdRTRX;
     address public  owner;
     TRC20 public tbt;
     CoinPool public nextCoinPool;
@@ -18,6 +19,7 @@ contract CoinPool{
     function getProfits() public view returns(int256);
     function withdrawProfit() external;
     function transfer(address to, uint256 _amount) external;
+    function transferToken(address  to, uint256 _amount, uint256 tokenID) external;
     function transferTBTAndTBS(address to,uint256 _TBT, uint256 _TBS) external;
     function ()external payable;
 }
@@ -131,18 +133,16 @@ contract Game{
 
     function dealTRX(address player, uint256 betValue, uint256 totalValue) internal {
         revert("no dealTRX");
+
+        address(_CoinPool).transfer(betValue);
+        if(totalValue > 0)
+            _CoinPool.transfer(player, totalValue);
     }
 
     function dealTBS(address player, uint256 betValue, uint256 totalValue) internal {
-        if (totalValue > betValue){
-            player.transferToken(betValue, tokenIdTBS);
-            _CoinPool.transfer(player, totalValue - betValue);
-        }else if(totalValue < betValue){
-            player.transferToken(totalValue, tokenIdTBS);
-            address(_CoinPool).transferToken(betValue - totalValue, tokenIdTBS);
-        }else{
-            player.transferToken(betValue, tokenIdTBS);
-        }
+        address(_CoinPool).transferToken(betValue, tokenIdTBS);
+        if(totalValue > 0)
+            _CoinPool.transferToken(player, totalValue, tokenIdTBS);
     }
 
     function openIbet(BetStruct storage ibet, uint256 betNumber, uint256 openNumber) internal returns(uint256,uint256)  {

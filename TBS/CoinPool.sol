@@ -272,9 +272,10 @@ contract CoinPool{
     // 参数: to 提现地址
     //      _amount 转账金额
     function transfer(address  to, uint256 _amount) external onlyGamer{
+        revert("forbidden transfer trx");
         // 转账金额不可超过一定比率
-        require(_amount * leverRadio < address(this).balance, "transfer ratio check");
-        to.transfer(_amount);
+        //require(_amount * leverRadio < address(this).balance, "transfer ratio check");
+        //to.transfer(_amount);
     }
 
     // 转账, 转账trc10到指定地址, 由Game合约调用, 当玩家胜利后, Game合约调用此方法发起转账
@@ -283,6 +284,7 @@ contract CoinPool{
     //      to 提现地址
     //      _amount 转账金额
     function transferToken(address  to, uint256 _amount, uint256 tokenID) external onlyGamer{
+        require(_amount * leverRadio < address(this).tokenBalance(tokenID), "transfer TBS ratio check");
         to.transferToken(_amount, tokenID);
     }
 
