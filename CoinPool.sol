@@ -20,7 +20,7 @@ contract CoinPool{
 
     // owner 合约拥有者, 拥有合约所有的权限. owner为合约创建者, 暂不支持更改.
     // 一定要保存好owner的私钥, 做好备份并禁止泄露.
-    address public  owner;
+    address payable public  owner;
     // key:游戏合约地址
     // value:是否允许动用资金 true:允许 false:禁止
     mapping(address=>GameStatus) public games;
@@ -55,7 +55,7 @@ contract CoinPool{
     // 权限: 无
     // 参数: _openning 资金池状态
     //      _leverRadio 资金比率
-
+/*
     constructor(CoinPool prePool, Game profit, bool _openning, uint256 _leverRadio, TRC20 _tbt, uint256 TBS_ID, uint256 RTRX_ID) public{
         preCoinPool = prePool;
         profitContract = profit;
@@ -66,19 +66,22 @@ contract CoinPool{
         tokenIdRTRX = RTRX_ID;
         tokenIdTBS = TBS_ID;
     }
+*/
 
-/*
     constructor(CoinPool prePool) public {
         preCoinPool = prePool;
-        owner = preCoinPool.owner();
+        //owner = preCoinPool.owner();
+        owner = msg.sender;
         nextCoinPool = CoinPool(owner);
         opening = false;
+        copyData();
+        isActive = true;
     }
-*/
+
     /* ------------------------------[Only Coinpool!]------------------------------- */
 
     function copyData() internal {
-        require(owner == preCoinPool.owner(), "copyData owner check");
+        //require(owner == preCoinPool.owner(), "copyData owner check");
         leverRadio = preCoinPool.leverRadio();
         tbt = preCoinPool.tbt();
         tokenIdRTRX = preCoinPool.tokenIdRTRX();
@@ -92,11 +95,11 @@ contract CoinPool{
         }
         profitContract = preCoinPool.profitContract();
         games[address(profitContract)] = preCoinPool.games(address(profitContract));
-        ownerFixedAdd = preCoinPool.ownerFixedAdd();
-        ownerFixedSub = preCoinPool.ownerFixedSub();
-        ownerInTRX = preCoinPool.ownerInTRX();
-        ownerOutTRX = preCoinPool.ownerOutTRX();
-        ownerOutRTRX = preCoinPool.ownerOutRTRX();
+        //ownerFixedAdd = preCoinPool.ownerFixedAdd();
+        //ownerFixedSub = preCoinPool.ownerFixedSub();
+        //ownerInTRX = preCoinPool.ownerInTRX();
+        //ownerOutTRX = preCoinPool.ownerOutTRX();
+        //ownerOutRTRX = preCoinPool.ownerOutRTRX();
         totalProfit = preCoinPool.totalProfit();
     }
 
@@ -112,7 +115,7 @@ contract CoinPool{
     function transferToNewCoinpool() public onlyCoinpool {
         require(opening == true && nextCoinPool.opening() == true, "transferToCoinpool opening check");
         require(totalProfit == nextCoinPool.totalProfit(), "transferToCoinpool totalProfit check");
-        require(owner == nextCoinPool.owner(), "transferToCoinpool owner check");
+        //require(owner == nextCoinPool.owner(), "transferToCoinpool owner check");
         msg.sender.transfer(balanceTRX());
         msg.sender.transferToken(balanceToken(tokenIdRTRX), tokenIdRTRX);
         msg.sender.transferToken(balanceToken(tokenIdTBS), tokenIdTBS);
@@ -267,7 +270,7 @@ contract CoinPool{
     // 权限: gamer
     // 参数: to 提现地址
     //      _amount 转账金额
-    function transfer(address  to, uint256 _amount) external onlyGamer{
+    function transfer(address payable to, uint256 _amount) external onlyGamer{
         // 转账金额不可超过一定比率
         require(_amount * leverRadio < address(this).balance, "transfer ratio check");
         to.transfer(_amount);
@@ -278,7 +281,7 @@ contract CoinPool{
     // 参数: tokenID token的ID
     //      to 提现地址
     //      _amount 转账金额
-    function transferToken(address  to, uint256 _amount, uint256 tokenID) external onlyGamer{
+    function transferToken(address payable to, uint256 _amount, uint256 tokenID) external onlyGamer{
         to.transferToken(_amount, tokenID);
     }
 
@@ -286,7 +289,7 @@ contract CoinPool{
         TRC20(trc20).transfer(to, _amount);
     }
 
-    function transferTBTAndTBS(address to,uint256 _TBT, uint256 _TBS) external onlyGamer{
+    function transferTBTAndTBS(address payable to,uint256 _TBT, uint256 _TBS) external onlyGamer{
         //tbt.transferFrom(owner, to, _TBT);
         tbt.transfer(to, _TBT);
         to.transferToken(_TBS, tokenIdTBS);
