@@ -70,8 +70,7 @@ contract CoinPool{
 
     constructor(CoinPool prePool) public {
         preCoinPool = prePool;
-        //owner = preCoinPool.owner();
-        owner = msg.sender;
+        owner = preCoinPool.owner();
         nextCoinPool = CoinPool(owner);
         opening = false;
         copyData();

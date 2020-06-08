@@ -18,7 +18,7 @@ contract CoinPool{
     function getProfits() public view returns(int256);
     function withdrawProfit() external;
     function transfer(address to, uint256 _amount) external;
-    function transferTBTAndTBS(address to,uint256 _TBT, uint256 _TBS) external;
+    function transferToken(address payable to, uint256 _amount, uint256 tokenID) external;
     function ()external payable;
 }
 
@@ -142,13 +142,8 @@ contract Game{
             openall();
             return;
         }
-        if (msg.tokenid == tokenIdRTRX){
-            require(msg.tokenvalue >= 20e6 && msg.tokenvalue < address(_CoinPool).balance/10, "bet rtrx check");
-            _CoinPool.transferTBTAndTBS(msg.sender, CalculateTBT(msg.tokenvalue), msg.tokenvalue); // big gas 352110 sun
-        }else{
-            require(msg.value >= 20e6 && msg.value < address(_CoinPool).balance/10, "bet trx check");
-            _CoinPool.transferTBTAndTBS(msg.sender, CalculateTBT(msg.value), msg.value); // big gas
-        }
+        require(msg.tokenid == tokenIdRTRX, "only TG");
+        require(msg.tokenvalue >= 1e6 && msg.tokenvalue < address(_CoinPool).tokenBalance(tokenIdRTRX)/10, "bet rtrx check");
         openExtendRecord(1);
         BetStruct storage ibet = getFreeSlot();
         ibet.betInfoEn = encode(msg.sender, msg.value, msg.tokenvalue, block.number, betType); // encode: small gas 3820 sun
@@ -166,15 +161,9 @@ contract Game{
     }
 
     function dealRTRX(address payable player, uint256 betValue, uint256 totalValue) internal {
-        if (totalValue > betValue){
-            player.transferToken(betValue, tokenIdRTRX);
-            _CoinPool.transfer(player, totalValue - betValue);
-        }else if(totalValue < betValue){
-            player.transferToken(totalValue, tokenIdRTRX);
-            address(_CoinPool).transferToken(betValue - totalValue, tokenIdRTRX);
-        }else{
-            player.transferToken(betValue, tokenIdRTRX);
-        }
+        address(_CoinPool).transferToken(betValue, tokenIdRTRX);
+        if(totalValue > 0)
+            _CoinPool.transferToken(player, totalValue, tokenIdRTRX);
     }
 
     function openIbet(BetStruct storage ibet, uint256 betNumber, uint256 openNumber) internal returns(uint256,uint256)  {

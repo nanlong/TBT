@@ -1,6 +1,6 @@
 main:
-coinpool:TWE37uQa9gDkWnHN5SdZC9XsWCX2m8dwro
-coinpool:TNi1VgwNHwCYVUvh7WfJgy7igEn2NhjfA7
+- coinpool:TWE37uQa9gDkWnHN5SdZC9XsWCX2m8dwro
+- coinpool:TNi1VgwNHwCYVUvh7WfJgy7igEn2NhjfA7
 coinpool:TC6ixKGqM9Xp6T1emfXjmCB8Zf1THRro4G
 HappySratch:TG7cTfMKuY37ynUDn9Nn514tkDnyjMEhMg
 HappyHash:TYjm5TFDQrXK1pme5awNXyFDZA6pHPFvbi
@@ -43,4 +43,8 @@ HappyHash:TNdzhRFzxGk1nnUPQJiZNW1McPcjpuk4DQ
 HappyHash16:TAEXqrx4EL5BCZXasGSDn7bHc41SSyKXJL
 
 
-sunnet:
+TG:
+coinpool: TYx78gQtzu6B44qBD3Y2tC2kC42A7fNJ74
+HappySratch: TVLC3XefpAe8yySKR2RE86qz2pFP6tbBc4
+HappyHash: TAzkRSQ82Tq3LE94QtvbDVvwwQqHYj7SwE
+HappyHash16: TCs42FaY5fJYn54yFRKatAed2t5yJvs4hN
