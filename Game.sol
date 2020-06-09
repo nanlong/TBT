@@ -1,38 +1,43 @@
 pragma solidity >=0.4.0;
 
-contract TRC20 {
-    function transfer(address to, uint tokens) public returns (bool success);
-    function transferFrom(address from, address to, uint tokens) public returns (bool success);
-    function approve(address _spender, uint256 _value) public;
-    uint256 public totalSupply;
-    mapping (address => uint256) public balanceOf;
-}
-
 contract CoinPool{
-    uint256 public tokenIdRTRX;
+    uint256 public tokenIdRLBT;
+    uint256 public tokenIdLBT;
+    uint256 public tokenIdTG;
     address public  owner;
-    TRC20 public tbt;
     CoinPool public nextCoinPool;
     address public profitContract;
     function isOpen() external view returns(bool);
-    function getProfits() public view returns(int256);
-    function withdrawProfit() external;
-    function transfer(address to, uint256 _amount) external;
     function transferToken(address payable to, uint256 _amount, uint256 tokenID) external;
     function ()external payable;
 }
 
 contract Game{
     // 判断输赢 返回赢取的总数
-    function isWin(uint32 betType, uint256 openNumber, uint256 betValue) internal pure returns (uint256 totalValue);
+    function isWin(uint24 betType, uint256 openNumber, uint256 betValue) internal pure returns (uint256 totalValue);
     // hash 到 number的转换函数
     function hashNumber(bytes32 betHash) internal pure returns(uint256 number);
 
     string public name;
     address public owner;
     CoinPool public  _CoinPool;
-    uint256 public tokenIdRTRX;
-    uint256 public MineFraction;
+    uint256 public tokenIdRLBT;
+    uint256 public tokenIdLBT;
+    uint256 public tokenIdTG;
+
+    enum TokenType{
+        None, // must have
+        LBT,
+        RLBT,
+        TG
+    }
+    struct BetInfo{
+        address payable player;
+        uint32 blockNo;
+        uint32 betAmount;
+        uint8 tokenType;
+        uint24 betType;
+    }
     struct BetStruct {
         bytes32 betInfoEn; //
     }
@@ -42,6 +47,7 @@ contract Game{
     bool public opening;
     BetStruct[] public BetRecordExtend;
     mapping(uint256=>bytes32) public Hashes;
+    mapping(uint256=>uint256) public tokenTypeMap;
 
     modifier onlyCoinPool(){require(msg.sender==address(_CoinPool), "onlyCoinPool");_;}
     modifier onlyOwner(){require(msg.sender==owner, "onlyOwner");_;}
@@ -52,12 +58,19 @@ contract Game{
         update();
         require(msg.sender!=owner, "contract owner check"); // owner不可以创建游戏合约
         nextOpen = 0;
-        MineFraction = (1<<128)|1000;
     }
     function () external payable{}
     function update() public {
         owner = _CoinPool.owner();
-        tokenIdRTRX = _CoinPool.tokenIdRTRX();
+        tokenIdLBT = _CoinPool.tokenIdLBT();
+        tokenIdRLBT = _CoinPool.tokenIdRLBT();
+        tokenIdTG = _CoinPool.tokenIdTG();
+        tokenTypeMap[tokenIdLBT] = uint256(TokenType.LBT);
+        tokenTypeMap[uint256(TokenType.LBT)] = tokenIdLBT;
+        tokenTypeMap[tokenIdRLBT] = uint256(TokenType.RLBT);
+        tokenTypeMap[uint256(TokenType.RLBT)] = tokenIdRLBT;
+        tokenTypeMap[tokenIdTG] = uint256(TokenType.TG);
+        tokenTypeMap[uint256(TokenType.TG)] = tokenIdTG;
         opening = _CoinPool.isOpen();
     }
     function switchCoinPool(address payable pool) external onlyOwner{
@@ -72,24 +85,6 @@ contract Game{
 
     function FeedHashes(uint256 number, uint256 _hash) external onlyOwner{
         Hashes[number] = bytes32(_hash);
-    }
-
-    function AdjustMineTBT(uint256 fenzi, uint256 fenmu) external onlyOwner returns(uint256) {
-        require(fenzi < (1<<128)-1, "fenzi to big");
-        require(fenmu < (1<<128)-1, "fenmu to big");
-        require(fenzi < fenmu, "fenzi > fenmu");
-        MineFraction = (fenzi << 128) | fenmu;
-        return CalculateTBT(1000);
-    }
-    function TBTFraction() external view returns(uint256,uint256) {
-        return (MineFraction>>128, uint256(uint128(MineFraction)));
-    }
-
-    function CalculateTBT(uint256 amount) public view returns(uint256){
-        uint256 fenzi = MineFraction>>128;
-        uint256 fenmu = uint256(uint128(MineFraction));
-        require(fenmu > 0, "fenmu == 0");
-        return amount * 1e12 * fenzi / fenmu;
     }
 
     function getHashByNumberUnsafe(uint256 number) internal view returns (bytes32 _hash){
@@ -108,45 +103,29 @@ contract Game{
         BetRecordExtend.length++;
         return BetRecordExtend[BetRecordExtend.length-1];
     }
-    function encode(address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType)internal pure returns(bytes32){
-        require(trxvalue < ((1<<31)*1e6) && 
-                rtrxvalue < ((1<<31)*1e6) && 
-                number < (1<<32) &&
-                uint256(player) < (1<<160), "encode check");
-        uint256 value = trxvalue/1e6;
-        if (rtrxvalue > 0) {
-            value = rtrxvalue/1e6;
-            value |= 1<<31;
-        }
-        return bytes32(uint256(player)<<(12*8) | value<<(8*8) | number<<(4*8) | betType);
-    }
-    function decode(bytes32 _en) internal pure returns(address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType){
-        uint256 en = uint256(_en);
-        player = address(en >> (12*8));
-        trxvalue = rtrxvalue = 0;
-        uint256 value = (en >> (8*8));
-        if ((value & (1<<31)) > 0)
-            rtrxvalue = (value & ((1<<31) - 1))*1e6;
-        else
-            trxvalue = (value & ((1<<31) - 1))*1e6;
-        number = (en >> (4*8)) & ((1<<32) - 1);
-        betType = uint32(en);
-    }
-
+    function BetInfoEncode(BetInfo memory s) internal pure returns(uint256) {return uint256(s.player)|uint256(s.blockNo)<<160|uint256(s.betAmount)<<192|uint256(s.tokenType)<<224|uint256(s.betType)<<232;}
+    function BetInfoDecode(uint256 en) internal pure returns(BetInfo memory) {return BetInfo(address(en),uint32(en>>160),uint32(en>>192),uint8(en>>224),uint24(en>>232));}
+    function BetInfoEnCreate(address payable player,uint32 blockNo,uint32 betAmount,uint8 tokenType,uint24 betType) internal pure returns(uint256) {return uint256(player)|uint256(blockNo)<<160|uint256(betAmount)<<192|uint256(tokenType)<<224|uint256(betType)<<232;}
+    function BetInfoCreate(address payable player,uint32 blockNo,uint32 betAmount,uint8 tokenType,uint24 betType) internal pure returns(BetInfo memory) {return BetInfo(player,blockNo,betAmount,tokenType,betType);}
+    
     function isContract() internal view returns (bool) {
         return tx.origin != msg.sender;
     }
 
-    function tibet(uint32 betType) internal gameOpened{
+    function tibet(uint24 betType) internal gameOpened{
         if(isContract()){
             openall();
             return;
         }
-        require(msg.tokenid == tokenIdRTRX, "only TG");
-        require(msg.tokenvalue >= 1e6 && msg.tokenvalue < address(_CoinPool).tokenBalance(tokenIdRTRX)/10, "bet rtrx check");
+        uint8 tokenTyp = uint8(tokenTypeMap[msg.tokenid]);
+        require(tokenTyp > 0, "only LBT,RLBT,TG");
+        uint256 checkTokenID = msg.tokenid;
+        if (checkTokenID == tokenIdRLBT)
+            checkTokenID = tokenIdLBT;
+        require(msg.tokenvalue >= 1e6 && msg.tokenvalue < address(_CoinPool).tokenBalance(checkTokenID)/10, "bet amount check");
         openExtendRecord(1);
         BetStruct storage ibet = getFreeSlot();
-        ibet.betInfoEn = encode(msg.sender, msg.value, msg.tokenvalue, block.number, betType); // encode: small gas 3820 sun
+        ibet.betInfoEn = bytes32(BetInfoEnCreate(msg.sender, uint32(block.number), uint32(msg.tokenvalue/1e6), tokenTyp, betType)); // encode: small gas 3820 sun
         emit betLog(ibet.betInfoEn); // gas 19170 sun
     }
 
@@ -154,35 +133,39 @@ contract Game{
         openExtendRecord(BetRecordExtend.length);
     }
 
-    function dealTRX(address player, uint256 betValue, uint256 totalValue) internal {
-        address(_CoinPool).transfer(betValue);
+    function dealLGLBT(address payable player, uint256 tokenID, uint256 betValue, uint256 totalValue) internal {
+        address(_CoinPool).transferToken(betValue, tokenID);
         if(totalValue > 0)
-            _CoinPool.transfer(player, totalValue);
+            _CoinPool.transferToken(player, totalValue, tokenID);
     }
 
-    function dealRTRX(address payable player, uint256 betValue, uint256 totalValue) internal {
-        address(_CoinPool).transferToken(betValue, tokenIdRTRX);
-        if(totalValue > 0)
-            _CoinPool.transferToken(player, totalValue, tokenIdRTRX);
+    function dealRLBT(address payable player, uint256 betValue, uint256 totalValue) internal {
+        if (totalValue > betValue){
+            player.transferToken(betValue, tokenIdRLBT);
+            _CoinPool.transferToken(player, totalValue - betValue, tokenIdLBT);
+            return;
+        }else if(totalValue < betValue){
+            player.transferToken(totalValue, tokenIdRLBT);
+            address(_CoinPool).transferToken(betValue - totalValue, tokenIdRLBT);
+        }else{
+            player.transferToken(betValue, tokenIdRLBT);
+        }
     }
 
     function openIbet(BetStruct storage ibet, uint256 betNumber, uint256 openNumber) internal returns(uint256,uint256)  {
-            (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number, uint32 betType) = decode(ibet.betInfoEn);
-            if (number >= block.number)
+            BetInfo memory info = BetInfoDecode(uint256(ibet.betInfoEn));
+            if (info.blockNo >= block.number)
                 return(0, 0);
-            if (betNumber != number)
-                openNumber = hashNumber(getHashByNumberSafe(number));
-            uint256 totalValue;
-            if(trxvalue > 0){
-                totalValue = isWin(betType, openNumber, trxvalue);
-                dealTRX(player, trxvalue, totalValue);
-            }
-            else{
-                totalValue = isWin(betType, openNumber, rtrxvalue);
-                dealRTRX(address(uint160(player)), rtrxvalue, totalValue);
-            }
+            if (betNumber != info.blockNo)
+                openNumber = hashNumber(getHashByNumberSafe(info.blockNo));
+            uint256 betAmount = info.betAmount * 1e6;
+            uint256 totalValue = isWin(info.betType, openNumber, betAmount);
+            if(info.tokenType == uint256(TokenType.RLBT))
+                dealRLBT(info.player, betAmount, totalValue);
+            else
+                dealLGLBT(info.player, tokenTypeMap[info.tokenType], betAmount, totalValue);
             //emit openLog(ibet.betInfoEn, totalValue);
-            return (number, openNumber);
+            return (info.blockNo, openNumber);
     }
 
     function openExtendRecord(uint256 num) public{
@@ -221,49 +204,55 @@ contract Game{
         }
     }
 
-    function xopen(uint256 num) public view returns(bytes32 id, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 trxvalue, uint256 rtrxvalue, uint256 winvalue){
+    function xopen(uint256 num) public view  returns(bytes32 rid, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 betAmount, uint256 tokenID, uint256 winvalue){
         return xopenWithHash(num, 0);
     }
 
-    function xopenWithHash(uint256 num, uint256 hashnum) public view returns(bytes32 id, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 trxvalue, uint256 rtrxvalue, uint256 winvalue){
+    function xopenWithHash(uint256 num, uint256 hashnum) public view  returns(bytes32 rid, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 betAmount, uint256 tokenID, uint256 winvalue){
         BetStruct storage ibet = BetRecordExtend[num];
         return preopenWithHash(uint256(ibet.betInfoEn), hashnum);
     }
 
-    function preopenWithHash(uint256 id, uint256 hashnum) public view  returns(bytes32 rid, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 trxvalue, uint256 rtrxvalue, uint256 winvalue){
-        (player, trxvalue, rtrxvalue, number, betType) = decode(bytes32(id));
+    function preopenInfoWithHash(BetInfo memory info, uint256 id, uint256 hashnum) internal view returns(bytes32 rid, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint24 betType, uint256 betAmount, uint256 tokenID, uint256 winvalue) {
         if(hashnum > 0)
             hashbyte = bytes32(hashnum);
         if(uint256(hashbyte) == 0)
-            hashbyte = getHashByNumberUnsafe(number);
+            hashbyte = getHashByNumberUnsafe(info.blockNo);
+        player = info.player;
+        number = info.blockNo;
+        betType = info.betType;
+        tokenID = tokenTypeMap[info.tokenType];
+        betAmount = info.betAmount*1e6;
         openNumber = hashNumber(hashbyte);
-        winvalue = isWin(betType, openNumber, trxvalue>0?trxvalue:rtrxvalue);
+        winvalue = isWin(info.betType, openNumber, betAmount);
         rid = bytes32(id);
     }
 
-    function preopen(uint256 id) public view  returns(bytes32 rid, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 trxvalue, uint256 rtrxvalue, uint256 winvalue){
+    function preopenWithHash(uint256 id, uint256 hashnum) public view returns(bytes32 rid, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 betAmount, uint256 tokenID, uint256 winvalue){
+        BetInfo memory info = BetInfoDecode(id);
+        return preopenInfoWithHash(info, id, hashnum);
+    }
+
+    function preopen(uint256 id) public view returns(bytes32 rid, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 betAmount, uint256 tokenID, uint256 winvalue){
         return preopenWithHash(id, 0);
     }
 
-    function getMyRecord() public view returns(bytes32 id, bytes32 _hash, uint256 rtx, uint256 rtrx){
+    function getMyRecord() public view returns(bytes32 rid, bytes32 hashbyte, uint256 number, uint256 openNumber, address player, uint32 betType, uint256 betAmount, uint256 tokenID, uint256 winvalue){
         if (BetRecordExtend.length > 0){
             uint256 limit = 0;
             if(BetRecordExtend.length > 256)
                 limit = BetRecordExtend.length - 256;
             for(uint256 i = BetRecordExtend.length; i > limit; i--){
-                bytes32 bid = BetRecordExtend[i-1].betInfoEn;
-                (address player, uint256 trxvalue, uint256 rtrxvalue, uint256 number,uint32 betType) = decode(bid);
-                trxvalue;rtrxvalue;betType;
-                if (player == msg.sender){
-                    return (bid, getHashByNumberUnsafe(number), msg.sender.balance, msg.sender.tokenBalance(tokenIdRTRX));
-                }
+                uint256 bid = uint256(BetRecordExtend[i-1].betInfoEn);
+                BetInfo memory info = BetInfoDecode(bid);
+                if (info.player == msg.sender)
+                    return preopenInfoWithHash(info, bid, 0);
             }
         }
-        return (0,0, msg.sender.balance, msg.sender.tokenBalance(tokenIdRTRX));
     }
 
-    function getMyBalance() public view returns(uint256 rtx, uint256 rtrx) {
-        return (msg.sender.balance, msg.sender.tokenBalance(tokenIdRTRX));
+    function getMyBalance() public view returns(uint256 lbt, uint256 rlbt, uint256 tg) {
+        return (msg.sender.tokenBalance(tokenIdLBT), msg.sender.tokenBalance(tokenIdRLBT), msg.sender.tokenBalance(tokenIdTG));
     }
 
     function withdraw() external onlyOwner {

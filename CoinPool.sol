@@ -29,16 +29,10 @@ contract CoinPool{
     // 比如资金池资金(poolBalance)=100, 杠杆比率(leverRadio)=10, 则游戏合约每次最多只能转账(transferAmount) = 10
     // 如果超过这个限度, 则转账失败, 不会发生任何的资金变动.
     uint256 public leverRadio;
-    uint256 public ownerFixedAdd;
-    uint256 public ownerFixedSub;
-    uint256 public ownerInTRX;
-    uint256 public ownerOutTRX;
-    uint256 public ownerOutRTRX;
-    uint256 public totalProfit;
-    Game public profitContract;
-    TRC20 public tbt;
-    uint256 public tokenIdRTRX;
-    uint256 public tokenIdTBS;
+ 
+    uint256 public tokenIdRLBT;
+    uint256 public tokenIdLBT;
+    uint256 public tokenIdTG;
 
     CoinPool public preCoinPool;
     CoinPool public nextCoinPool;
@@ -47,7 +41,6 @@ contract CoinPool{
     modifier onlyOwner(){require(msg.sender==owner, "onlyOwner");_;}
     // mustOpen 表示只有资金池处于打开状态, 并且对应的game允许动用资金, 才可以通过
     modifier onlyGamer(){require(opening==true&&games[msg.sender]==GameStatus.OPEN, "onlyGamer");_;}
-    modifier onlyProfit(){require(opening=true&&msg.sender == address(profitContract), "onlyProfit");_;}
 
     modifier onlyCoinpool(){require(msg.sender==address(nextCoinPool), "onlyCoinpool");_;}
 
@@ -68,67 +61,18 @@ contract CoinPool{
     }
 */
 
-    constructor(CoinPool prePool) public {
+    constructor(CoinPool prePool, uint256 lbt, uint256 rlbt, uint256 tg) public {
         preCoinPool = prePool;
         owner = preCoinPool.owner();
         nextCoinPool = CoinPool(owner);
-        opening = false;
-        copyData();
+        opening = true;
+        tokenIdLBT = lbt;
+        tokenIdRLBT = rlbt;
+        tokenIdTG = tg;
         isActive = true;
     }
 
     /* ------------------------------[Only Coinpool!]------------------------------- */
-
-    function copyData() internal {
-        //require(owner == preCoinPool.owner(), "copyData owner check");
-        leverRadio = preCoinPool.leverRadio();
-        tbt = preCoinPool.tbt();
-        tokenIdRTRX = preCoinPool.tokenIdRTRX();
-        tokenIdTBS = preCoinPool.tokenIdTBS();
-        for(uint256 i = 0; i < preCoinPool.gameCount(); i++){
-            Game game = preCoinPool.gamelist(i);
-            if(preCoinPool.games(address(game)) == GameStatus.OPEN){
-                gamelist.push(game);
-                games[address(game)] = GameStatus.OPEN;
-            }
-        }
-        profitContract = preCoinPool.profitContract();
-        games[address(profitContract)] = preCoinPool.games(address(profitContract));
-        //ownerFixedAdd = preCoinPool.ownerFixedAdd();
-        //ownerFixedSub = preCoinPool.ownerFixedSub();
-        //ownerInTRX = preCoinPool.ownerInTRX();
-        //ownerOutTRX = preCoinPool.ownerOutTRX();
-        //ownerOutRTRX = preCoinPool.ownerOutRTRX();
-        totalProfit = preCoinPool.totalProfit();
-    }
-
-    function ActiveCoinPool() public onlyOwner{
-        require(opening == false, "ActiveCoinPool opening check");
-        require(isActive == false, "ActiveCoinPool active check");
-        copyData();
-        opening = true;
-        preCoinPool.transferToNewCoinpool();
-        isActive = true;
-    }
-
-    function transferToNewCoinpool() public onlyCoinpool {
-        require(opening == true && nextCoinPool.opening() == true, "transferToCoinpool opening check");
-        require(totalProfit == nextCoinPool.totalProfit(), "transferToCoinpool totalProfit check");
-        //require(owner == nextCoinPool.owner(), "transferToCoinpool owner check");
-        msg.sender.transfer(balanceTRX());
-        msg.sender.transferToken(balanceToken(tokenIdRTRX), tokenIdRTRX);
-        msg.sender.transferToken(balanceToken(tokenIdTBS), tokenIdTBS);
-        tbt.transfer(msg.sender, tbt.balanceOf(address(this)));
-
-        for(uint256 i = 0; i < gamelist.length; i++){
-            Game game = gamelist[i];
-            if(games[address(game)] == GameStatus.OPEN){
-                game.updateCoinPool();
-            }
-        }
-        profitContract.updateCoinPool();
-        opening = false;
-    }
 
     /* ------------------------------[Only Owner!]------------------------------- */
 
@@ -136,41 +80,16 @@ contract CoinPool{
         nextCoinPool = pool;
     }
 
-    function switchTBT(TRC20 _tbt) public onlyOwner{
-        tbt = _tbt;
+    function switchRLBT(uint256 token) public onlyOwner{
+        tokenIdRLBT = token;
     }
 
-    function switchRTRX(uint256 token)public onlyOwner{
-        tokenIdRTRX = token;
+    function switchTG(uint256 token)public onlyOwner{
+        tokenIdTG = token;
     }
 
-    function switchTBS(uint256 token)public onlyOwner{
-        tokenIdTBS = token;
-    }
-
-    function justAddProfitContract(Game profit) public onlyOwner {
-        profitContract = profit;
-        games[address(profitContract)] = GameStatus.OPEN;
-        profitContract.update();
-    }
-
-    function switchProfitContract(Game profit) public {
-        games[address(profitContract)] = GameStatus.CLOSE;
-        profitContract.update();
-        justAddProfitContract(profit);
-    }
-
-    function addProfitTRX(uint256 amount) public onlyOwner {
-        require(ownerInTRX >= amount, "addOwnerInTRX check");
-        ownerInTRX -= amount;
-        ownerFixedSub += amount;
-    }
-
-    function addOwnerInTRX(uint256 amount) public onlyOwner{
-        if(opening)
-            require(ownerInTRX + amount > ownerInTRX, "addOwnerInTRX check");
-        ownerInTRX += amount;
-        ownerFixedAdd += amount;
+    function switchLBT(uint256 token)public onlyOwner{
+        tokenIdLBT = token;
     }
     
     function update(uint256 start, uint256 end) public onlyOwner {
@@ -244,19 +163,11 @@ contract CoinPool{
     // 权限: owner
     // 参数: _amount 提现金额, 如果提现金额比资金池大, 则提走全部资金 
     function withdraw(uint256  _amount) external onlyOwner{
-        if (opening)
-            require(ownerOutTRX + _amount > ownerOutTRX, "withdraw check");
         msg.sender.transfer(_amount);
-        if (ownerOutTRX + _amount > ownerOutTRX)
-            ownerOutTRX += _amount;
     }
 
     function withdrawToken(uint256 _amount, uint256 tokenID) external onlyOwner {
-        if (opening)
-            require(ownerOutRTRX + _amount > ownerOutRTRX, "withdrawToken check");
         msg.sender.transferToken(_amount, tokenID);
-        if(tokenID == tokenIdRTRX && ownerOutRTRX + _amount > ownerOutRTRX)
-            ownerOutRTRX += _amount;
     }
 
     function withdrawTRC20(address trc, uint256 _amount) external onlyOwner {
@@ -284,16 +195,6 @@ contract CoinPool{
         to.transferToken(_amount, tokenID);
     }
 
-    function transferTRC20(address to, uint256 _amount, address trc20) external onlyGamer{
-        TRC20(trc20).transfer(to, _amount);
-    }
-
-    function transferTBTAndTBS(address payable to,uint256 _TBT, uint256 _TBS) external onlyGamer{
-        //tbt.transferFrom(owner, to, _TBT);
-        tbt.transfer(to, _TBT);
-        to.transferToken(_TBS, tokenIdTBS);
-    }
-
     /* ------------------------------[Only View!]------------------------------- */
 
     function gameCount() external view returns(uint256){
@@ -313,27 +214,7 @@ contract CoinPool{
 
     /* ------------------------------[Only Profit!]------------------------------- */
 
-    function getProfits() public view returns(int256){
-        uint256 curAmount = balanceTRX() + balanceToken(tokenIdRTRX);
-        uint256 totalOut = ownerOutTRX + ownerOutRTRX;
-        uint256 totalIn = ownerInTRX;
-        return int256(curAmount + totalOut) - int(totalIn);
-    }
-
-    function withdrawProfit() external onlyProfit {
-        int256 curProfits = getProfits();
-        require(curProfits > 0, "withdrawProfit check");
-        msg.sender.transfer(uint256(curProfits));
-        totalProfit += uint256(curProfits);
-    }
-
     /* ------------------------------[Only Deposit!]------------------------------- */
-
-    function DepositTRX() external payable {
-        require(msg.tokenvalue == 0 && msg.value > 0, "DepositTRX value check");
-        require(ownerInTRX + msg.value > ownerInTRX, "DepositTRX add check");
-        ownerInTRX += msg.value;
-    }
 
     // 充值, 向合约转账即表示向合约充值. 玩家失败后, 或者想增加资金数, 由此向合约充值.
     // 权限: 无

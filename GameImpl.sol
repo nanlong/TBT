@@ -6,7 +6,7 @@ contract HappyHash is Game{
     constructor(string memory _name, address payable pool) Game(_name,pool) public{}
 
     // 返回: (输赢,注数)
-    function isWin(uint32 betType, uint256 openNumber, uint256 betValue) internal pure returns (uint256 totalValue) {
+    function isWin(uint24 betType, uint256 openNumber, uint256 betValue) internal pure returns (uint256 totalValue) {
         betType = betType&(0x3ff);
         uint256 winFlag = 1<<(openNumber&0xf);
         if ((betType & winFlag)==0)
@@ -27,7 +27,7 @@ contract HappyHash is Game{
         return number&0xf;
     }
 
-    function bet(uint32 betType) external payable{
+    function bet(uint24 betType) external payable{
         tibet(betType);
     }
 }
@@ -36,7 +36,7 @@ contract HappyHash16 is Game{
     constructor(string memory _name, address payable pool) Game(_name,pool) public{}
 
     // 返回: (输赢,注数)
-    function isWin(uint32 betType, uint256 openNumber, uint256 betValue) internal pure returns (uint256 totalValue) {
+    function isWin(uint24 betType, uint256 openNumber, uint256 betValue) internal pure returns (uint256 totalValue) {
         betType = betType&(0xffff);
         uint256 winFlag = 1<<(openNumber&0xf);
         if ((betType & winFlag)==0)
@@ -53,7 +53,7 @@ contract HappyHash16 is Game{
         return uint256(betHash)&0xf;
     }
 
-    function bet(uint32 betType) external payable{
+    function bet(uint24 betType) external payable{
         tibet(betType);
     }
 }
@@ -61,7 +61,7 @@ contract HappyHash16 is Game{
 contract HappyScratch is Game{
     constructor(string memory _name, address payable pool) Game(_name,pool) public{}
     // 返回: (输赢,注数)
-    function isWin(uint32 betType, uint256 openNumber, uint256 betValue) internal pure returns (uint256 totalValue) {
+    function isWin(uint24 betType, uint256 openNumber, uint256 betValue) internal pure returns (uint256 totalValue) {
         betType;
         return (betValue * openNumber * 90) / (50*100); // betValue*(openNumber/50)*0.9
     }

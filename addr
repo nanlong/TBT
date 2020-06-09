@@ -2,15 +2,15 @@ main:
 - coinpool:TWE37uQa9gDkWnHN5SdZC9XsWCX2m8dwro
 - coinpool:TNi1VgwNHwCYVUvh7WfJgy7igEn2NhjfA7
 coinpool:TC6ixKGqM9Xp6T1emfXjmCB8Zf1THRro4G
-HappySratch:TG7cTfMKuY37ynUDn9Nn514tkDnyjMEhMg
+HappyScratch:TG7cTfMKuY37ynUDn9Nn514tkDnyjMEhMg
 HappyHash:TYjm5TFDQrXK1pme5awNXyFDZA6pHPFvbi
 HappyHash16:TFw8oMTZ9ExSZupATKJoFJAogTKNarepDc
-HappySratch-PC:TDV95vwz6HpVm6j1niUTctLo15q7oY15pL
+HappyScratch-PC:TDV95vwz6HpVm6j1niUTctLo15q7oY15pL
 exchange: TTL264DQmBabZdBciReYGtkCUDpfCdXQKf
 -----
 HappyHashRig:TSE1ivPQdgErzGqMimscYRVADCwAnWE8si
 HappyHash16:TKmRW1Aoxo1QtQfqdS1ZVcgRL9giaFhhGP
-HappySratch:THD7TzyvA9U2fygTVrfQBFMkuqS7CjVxSd
+HappyScratch:THD7TzyvA9U2fygTVrfQBFMkuqS7CjVxSd
 -----
 HappyHashRig-fix:TEmfGNkTPzsXdWVMcMHngj3wJg8mqLd6b8
 
@@ -23,7 +23,7 @@ coinpool:TAxyzT8ViDQ6tLDUxTyETbxFBdwTHfLvqS
 /* skip
 main-TBS:
 coinpool:TVk7FrYqycX4J4uUdgKVvbsb7JgX4fvcVJ
-HappySratch:TWEbUd9GBk1U4A27K2FwNcZwxkFc5DQjWA
+HappyScratch:TWEbUd9GBk1U4A27K2FwNcZwxkFc5DQjWA
 HappyHash:TA13CQpNd3o2hxL33g4xCEWUGihx5FLvtT
 HappyHash16:TPbeoGdDrqStYvfUs45f44VKEbjw6AZnf9
 
@@ -38,13 +38,13 @@ TFTRdXxb7wjwpdpFL7sRdujS2n1qDFJa5J
 
 main-TBS2:
 coinpool:TJTzEsuNpuCdsZkCo7XQdBE6what59P2pA
-HappySratch:TDa5xfc3t9xknBSPvVzJtVrAU58xHDnUbQ
+HappyScratch:TDa5xfc3t9xknBSPvVzJtVrAU58xHDnUbQ
 HappyHash:TNdzhRFzxGk1nnUPQJiZNW1McPcjpuk4DQ
 HappyHash16:TAEXqrx4EL5BCZXasGSDn7bHc41SSyKXJL
 
 
 TG:
-coinpool: TYx78gQtzu6B44qBD3Y2tC2kC42A7fNJ74
-HappySratch: TVLC3XefpAe8yySKR2RE86qz2pFP6tbBc4
-HappyHash: TAzkRSQ82Tq3LE94QtvbDVvwwQqHYj7SwE
-HappyHash16: TCs42FaY5fJYn54yFRKatAed2t5yJvs4hN
+coinpool: TZBFjhFY1aDHaYN7Tt6EUmqXdAyao9WYes
+HappyScratch: TAs2dESvB9PwsNZpjcLYqG4xAWve54nRbR
+HappyHash: TQ3nrH2Z3vrGLnEfDyAtvt6hshJMyNAxtQ
+HappyHash16: TAUAg7AQmrbq3wGJ6rA7x9xdcrK82GuFzk
