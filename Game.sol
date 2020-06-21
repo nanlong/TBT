@@ -158,7 +158,7 @@ contract Game{
                 return(0, 0);
             if (betNumber != info.blockNo)
                 openNumber = hashNumber(getHashByNumberSafe(info.blockNo));
-            uint256 betAmount = info.betAmount * 1e6;
+            uint256 betAmount = uint256(info.betAmount) * 1e6;
             uint256 totalValue = isWin(info.betType, openNumber, betAmount);
             if(info.tokenType == uint256(TokenType.RLBT))
                 dealRLBT(info.player, betAmount, totalValue);

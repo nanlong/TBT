@@ -95,12 +95,12 @@ async function coinpool_check_main(){
     D("tokenIdRTRX", await coinpool.tokenIdRTRX().call())
 }
 
-async function game_Deploy_main(){
+async function game_Deploy_main(gameName){
     helpAPI();
     contractMap = parseCombinedJson(process.argv[2])
-    mainEntry = contractMap['GameImpl.sol:HappyScratch']
-    mainEntryDeploy = await deploy_contract(mainEntry, ["HappyScratch_TG","TZBFjhFY1aDHaYN7Tt6EUmqXdAyao9WYes"])
-    D("mainEntry:", mainEntryDeploy.address, tronWeb.address.fromHex(mainEntryDeploy.address))
+    mainEntry = contractMap[`GameImpl.sol:${gameName}`]
+    mainEntryDeploy = await deploy_contract(mainEntry, [`${gameName}_TGRLBT`,"TZBFjhFY1aDHaYN7Tt6EUmqXdAyao9WYes"])
+    D("mainEntry:", await mainEntryDeploy.name().call(), tronWeb.address.fromHex(mainEntryDeploy.address))
     let owner = await mainEntryDeploy.owner().call();
     D("owner:", owner,tronWeb.address.fromHex(owner));
     D("tokenIdLBT", (await mainEntryDeploy.tokenIdLBT().call()).toString());
@@ -110,17 +110,17 @@ async function game_Deploy_main(){
 
 async function game_check_main(){
     contractMap = parseCombinedJson(process.argv[2])
-    let HappyScratch = localContract(contractMap['GameImpl.sol:HappyScratch'].abi, "TAs2dESvB9PwsNZpjcLYqG4xAWve54nRbR");
+    let HappyScratch = localContract(contractMap['GameImpl.sol:HappyScratch'].abi, "TBgtKKrmzEXSanNfvE5qhmhPPeemiemAyR");
     D("name", await HappyScratch.name().call());
     D("_CoinPool", tronWeb.address.fromHex(await HappyScratch._CoinPool().call()))
     D("owner", await HappyScratch.owner().call());
     D("opening", await HappyScratch.opening().call());
-    let happyhash = localContract(contractMap['GameImpl.sol:HappyHash'].abi, "TQ3nrH2Z3vrGLnEfDyAtvt6hshJMyNAxtQ");
+    let happyhash = localContract(contractMap['GameImpl.sol:HappyHash'].abi, "TXkiiMJsiLaNjxEWLPBiAGawuzfPhRcKbC");
     D("name", await HappyScratch.name().call());
     D("_CoinPool", tronWeb.address.fromHex(await HappyScratch._CoinPool().call()))
     D("owner", await happyhash.owner().call());
     D("opening", await happyhash.opening().call());
-    let happyhash16 = localContract(contractMap['GameImpl.sol:HappyHash16'].abi, "TAUAg7AQmrbq3wGJ6rA7x9xdcrK82GuFzk");
+    let happyhash16 = localContract(contractMap['GameImpl.sol:HappyHash16'].abi, "TYSWQ6muad74tduRByPnqYp6JSGsiAy44N");
     D("name", await HappyScratch.name().call());
     D("_CoinPool", tronWeb.address.fromHex(await HappyScratch._CoinPool().call()))
     D("owner", await happyhash16.owner().call());
@@ -128,6 +128,8 @@ async function game_check_main(){
 }
 
 function main(){
+    //const list = ['HappyScratch', 'HappyHash', 'HappyHash16'];
+    //game_Deploy_main(list[2]);
     game_check_main();
 }
 
