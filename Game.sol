@@ -20,7 +20,7 @@ contract Game{
 
     string public name;
     address public owner;
-    CoinPool public  _CoinPool;
+    CoinPool public  _CoinPool; // 奖池，资金会归集到这里
     uint256 public tokenIdRLBT;
     uint256 public tokenIdLBT;
     uint256 public tokenIdTG;
@@ -32,22 +32,22 @@ contract Game{
         TG
     }
     struct BetInfo{
-        address payable player;
-        uint32 blockNo;
-        uint32 betAmount;
-        uint8 tokenType;
-        uint24 betType;
+        address payable player; // 下注人地址
+        uint32 blockNo; // 下注区块
+        uint32 betAmount; // 下注金额
+        uint8 tokenType;  // 下注的token编号
+        uint24 betType; // 下注号码
     }
     struct BetStruct {
-        bytes32 betInfoEn; //
+        bytes32 betInfoEn; // BetInfo 编码为bytes32，节省gas
     }
     event betLog(bytes32 id);
     //event openLog(uint256 id, uint256 totalValue);
-    uint256 public nextOpen;
-    bool public opening;
-    BetStruct[] public BetRecordExtend;
-    mapping(uint256=>bytes32) public Hashes;
-    mapping(uint256=>uint256) public tokenTypeMap;
+    uint256 public nextOpen; // 未开奖的序号，BetRecordExtend[nextOpen]
+    bool public opening; // ture: 合约工作 false: 合约暂停
+    BetStruct[] public BetRecordExtend; // 所有用户下注集合，每次下注追加在最后
+    mapping(uint256=>bytes32) public Hashes; // 区块高度=>区块hash
+    mapping(uint256=>uint256) public tokenTypeMap; // token编号=>token
 
     modifier onlyCoinPool(){require(msg.sender==address(_CoinPool), "onlyCoinPool");_;}
     modifier onlyOwner(){require(msg.sender==owner, "onlyOwner");_;}
@@ -129,6 +129,7 @@ contract Game{
         emit betLog(ibet.betInfoEn); // gas 19170 sun
     }
 
+    // 开奖
     function openall() public{
         openExtendRecord(BetRecordExtend.length);
     }
